@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AirTracking</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F4F9FF;--card:#fff;--ink:#0F2A4A;--mute:#6B84A3;--blue:#1E6FD9;--blue2:#DCEAFB;--track:#E3EEFB;--warn:#E8890C;--off:#B8C7D9;--line:#E3ECF7}
+*{box-sizing:border-box}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:'Outfit',system-ui,sans-serif;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+.wrap{max-width:1040px;margin:0 auto;padding:20px 16px 40px}
+header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:22px}
+h1{margin:0;font-size:26px;font-weight:700}h1 b{color:var(--blue)}
+.sub{color:var(--mute);font-size:14px;margin-top:2px}
+.nav{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.btn{background:var(--card);border:1px solid var(--line);border-radius:999px;padding:8px 16px;font:inherit;font-weight:600;color:var(--ink);cursor:pointer}
+.btn.p{background:var(--blue);border-color:var(--blue);color:#fff}.btn.d{color:#C0392B}
+.btn:focus-visible,button.card:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+.chip{font-size:13px;color:var(--mute)}
+.card{background:var(--card);border-radius:20px;padding:18px;border:1px solid var(--line);text-align:left;font:inherit;color:inherit;width:100%}
+button.card{cursor:pointer;transition:transform .15s,box-shadow .15s}
+button.card:hover{transform:translateY(-2px);box-shadow:0 8px 22px rgba(30,111,217,.15)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:16px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:22px}
+.tile span{color:var(--mute);font-size:13px;display:block}.tile b{font-size:30px;color:var(--blue)}.tile.w b{color:var(--warn)}
+.sec{font-weight:600;font-size:17px;margin:0 0 12px}
+.ch{display:flex;justify-content:space-between;align-items:center;font-weight:600}
+.badge{font-size:12px;padding:3px 10px;border-radius:999px;background:var(--blue2);color:#0B4A9C;font-weight:600}.badge.w{background:#FDEBD3;color:#9A5A06}.badge.off{background:#E8EDF3;color:#6B7C88}
+.loc{color:var(--mute);font-size:13px;margin-top:2px}
+.vals{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
+.v{background:var(--bg);border-radius:12px;padding:8px 10px}.v small{display:block;color:var(--mute);font-size:11px}.v b{font-size:17px}.v.w b{color:var(--warn)}
+.empty{height:84px;display:flex;align-items:center;justify-content:center;color:var(--mute);font-size:14px;margin-top:14px;border-radius:14px;background:var(--bg)}
+.dgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:16px}
+.g{text-align:center}.g .lb{font-weight:600;text-align:left}.gw{position:relative;margin:8px auto 0;width:170px}.gw svg{display:block;width:100%}
+.gv{position:absolute;left:0;right:0;bottom:0;font-size:24px;font-weight:700;line-height:1}.gv small{display:block;font-size:11px;font-weight:500;color:var(--mute);margin-top:2px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:6px 0 12px}.tab{border:1px solid var(--line);background:#fff;border-radius:999px;padding:5px 14px;font:inherit;font-size:13px;cursor:pointer}.tab.on{background:var(--blue);color:#fff;border-color:var(--blue)}
+.chart{width:100%;overflow-x:auto}.chart svg{display:block;width:100%;min-width:480px}
+.note{font-size:13px;color:var(--mute);margin-top:6px}.dim{opacity:.75}
+.login{max-width:380px;margin:12vh auto 0}.login input,.f input{width:100%;padding:11px 14px;margin:6px 0 12px;border:1px solid var(--line);border-radius:12px;font:inherit;background:#fff;color:var(--ink)}
+.err{color:#C0392B;font-size:13px;min-height:18px;margin-bottom:8px}
+table{width:100%;border-collapse:collapse;font-size:14px}th,td{padding:10px 8px;border-bottom:1px solid var(--line);text-align:left}th{color:var(--mute);font-weight:500}
+.f{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:0 12px;align-items:end;margin-bottom:8px}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+var C=window.AIR_CONFIG, sb=supabase.createClient(C.SUPABASE_URL,C.SUPABASE_ANON);
+// Rentang normal (acuan awal, sesuaikan dengan baku mutu yang dipakai proyek).
+var P={ph:{n:'pH',u:'',lo:6.5,hi:8.5,max:14,d:1},ec:{n:'EC',u:'µS/cm',lo:0,hi:1500,max:3000,d:0},tds:{n:'TDS',u:'ppm',lo:0,hi:500,max:1500,d:0},
+ do:{n:'DO',u:'mg/L',lo:5,hi:14,max:14,d:1},temp:{n:'Suhu',u:'°C',lo:20,hi:32,max:50,d:1},turb:{n:'Kekeruhan',u:'NTU',lo:0,hi:5,max:50,d:1}};
+var K=Object.keys(P), S={role:null,email:'',devs:[],sel:null,view:'main',hist:[],par:'ph',err:''};
+function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]})}
+function bad(k,v){return v==null||v<P[k].lo||v>P[k].hi}
+function fmt(k,v){return v==null?'–':Number(v).toFixed(P[k].d)}
+function ago(t){if(!t)return 'belum pernah kirim data';var m=Math.round((Date.now()-new Date(t))/60000);return m<1?'baru saja':m<60?m+' menit lalu':m<1440?Math.round(m/60)+' jam lalu':Math.round(m/1440)+' hari lalu'}
+function warns(d){return d.last?K.filter(function(k){return d.last[k]!=null&&bad(k,d.last[k])}):[]}
+function head(t,s){return '<header><div><h1>'+t+'</h1><div class="sub">'+s+'</div></div><div class="nav"><span class="chip">'+esc(S.email)+' · '+S.role+'</span>'+
+ (S.role==='admin'?'<button class="btn" data-go="'+(S.view==='admin'?'main':'admin')+'">'+(S.view==='admin'?'Dashboard':'Kelola alat')+'</button>':'')+'<button class="btn" id="out">Keluar</button></div></header>'}
+function loginV(){return '<div class="login card"><h1>Air<b>Tracking</b></h1><div class="sub" style="margin-bottom:18px">Pemantauan kualitas air berbasis IoT</div>'+
+ '<label>Email<input id="em" type="email" autocomplete="username"></label><label>Kata sandi<input id="pw" type="password" autocomplete="current-password"></label><div class="err">'+esc(S.err)+'</div><button class="btn p" id="in" style="width:100%">Masuk</button></div>'}
+function mainV(){
+ var n=S.devs.length,w=S.devs.filter(function(d){return warns(d).length}).length,sent=S.devs.filter(function(d){return d.last_seen}).length;
+ var h=head('Air<b>Tracking</b>','Dashboard kualitas air')+'<div class="tiles"><div class="card tile"><span>Alat terdaftar</span><b>'+n+'</b></div><div class="card tile"><span>Pernah kirim data</span><b>'+sent+'</b></div><div class="card tile'+(w?' w':'')+'"><span>Perlu perhatian</span><b>'+w+'</b></div></div><h2 class="sec">Daftar alat</h2><div class="grid">';
+ S.devs.forEach(function(d,i){var ws=warns(d);
+  h+='<button class="card'+(d.last?'':' dim')+'" data-i="'+i+'"><div class="ch"><span>'+esc(d.name)+'</span><span class="badge'+(!d.last?' off':ws.length?' w':'')+'">'+(!d.last?'Belum ada data':ws.length?'Perlu perhatian':'Baik')+'</span></div><div class="loc">'+esc(d.id)+' · '+esc(d.loc_code)+' · '+ago(d.last_seen)+'</div>'+
+  (d.last?'<div class="vals">'+K.map(function(k){return '<div class="v'+(bad(k,d.last[k])?' w':'')+'"><small>'+P[k].n+'</small><b>'+fmt(k,d.last[k])+'</b></div>'}).join('')+'</div>':'<div class="empty">Alat belum mengirim data</div>')+'</button>'});
+ return h+(n?'':'<div class="card empty">Belum ada alat. Admin dapat meregistrasi di menu Kelola alat.</div>')+'</div>'}
+function gauge(k,v){var p=v==null?0:Math.max(0,Math.min(100,v/P[k].max*100));
+ return '<div class="card g"><div class="lb">'+P[k].n+'</div><div class="gw"><svg viewBox="0 0 120 68"><path d="M10 60 A50 50 0 0 1 110 60" pathLength="100" fill="none" stroke="#E3EEFB" stroke-width="12" stroke-linecap="round"/><path d="M10 60 A50 50 0 0 1 110 60" pathLength="100" fill="none" stroke="'+(bad(k,v)?'#E8890C':'#1E6FD9')+'" stroke-width="12" stroke-linecap="round" stroke-dasharray="'+Math.max(p,.5)+' 100"/></svg><div class="gv">'+fmt(k,v)+'<small>'+P[k].u+'</small></div></div><div class="note">Normal: '+P[k].lo+'–'+P[k].hi+'</div></div>'}
+function chart(){var r=S.hist.filter(function(x){return x[S.par]!=null});
+ if(r.length<2)return '<div class="empty">Data riwayat belum cukup untuk grafik</div>';
+ var W=640,H=200,m=34,v=r.map(function(x){return x[S.par]}),mn=Math.min.apply(null,v),mx=Math.max.apply(null,v);if(mn===mx){mn-=1;mx+=1}
+ var pts=r.map(function(x,i){return (m+i*(W-m-10)/(r.length-1)).toFixed(1)+','+(H-24-(x[S.par]-mn)/(mx-mn)*(H-44)).toFixed(1)}).join(' ');
+ return '<div class="chart"><svg viewBox="0 0 '+W+' '+H+'"><line x1="'+m+'" y1="'+(H-24)+'" x2="'+(W-10)+'" y2="'+(H-24)+'" stroke="#E3EEFB"/><polyline points="'+pts+'" fill="none" stroke="#1E6FD9" stroke-width="2.5" stroke-linejoin="round"/><text x="2" y="20" font-size="11" fill="#6B84A3">'+mx.toFixed(1)+'</text><text x="2" y="'+(H-26)+'" font-size="11" fill="#6B84A3">'+mn.toFixed(1)+'</text><text x="'+m+'" y="'+(H-6)+'" font-size="11" fill="#6B84A3">'+new Date(r[0].created_at).toLocaleString('id-ID',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})+'</text><text x="'+(W-10)+'" y="'+(H-6)+'" text-anchor="end" font-size="11" fill="#6B84A3">'+new Date(r[r.length-1].created_at).toLocaleString('id-ID',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})+'</text></svg></div>'}
+function detailV(){var d=S.devs[S.sel],l=d.last||{};
+ return '<button class="btn" id="bk" style="margin-bottom:16px">‹ Semua alat</button>'+head(esc(d.name),esc(d.id)+' · '+esc(d.loc_code)+' · terakhir kirim: '+ago(d.last_seen))+
+ (d.last?'<div class="dgrid">'+K.map(function(k){return gauge(k,l[k])}).join('')+'</div>':'<div class="card empty">Alat belum mengirim data</div>')+
+ '<div class="card"><div class="sec">Riwayat pengukuran</div><div class="tabs">'+K.map(function(k){return '<button class="tab'+(k===S.par?' on':'')+'" data-par="'+k+'">'+P[k].n+'</button>'}).join('')+'</div>'+chart()+'</div>'}
+function adminV(){
+ return head('Kelola alat','Registrasi dan CRUD alat pemantauan air')+'<div class="card" style="margin-bottom:16px"><div class="sec">Registrasi alat baru</div><div class="f"><label>ID alat<input id="a_id" placeholder="AIR-01"></label><label>Nama<input id="a_n" placeholder="Kolam Utama"></label><label>Kode lokasi<input id="a_l" placeholder="LOK-01"></label><label>Credential<input id="a_k" placeholder="rahasia alat"></label></div><div class="err">'+esc(S.err)+'</div><button class="btn p" id="add">Tambah alat</button><div class="note">Credential dimasukkan juga ke firmware alat. Setelah disimpan, tidak bisa dilihat lagi dari web.</div></div>'+
+ '<div class="card" style="overflow-x:auto"><table><tr><th>ID</th><th>Nama</th><th>Lokasi</th><th>Terakhir kirim</th><th></th></tr>'+
+ S.devs.map(function(d,i){return '<tr><td>'+esc(d.id)+'</td><td>'+esc(d.name)+'</td><td>'+esc(d.loc_code)+'</td><td>'+ago(d.last_seen)+'</td><td><button class="btn" data-ed="'+i+'">Ubah</button> <button class="btn d" data-del="'+i+'">Hapus</button></td></tr>'}).join('')+'</table></div>'}
+function render(){
+ var a=document.getElementById('app');
+ a.innerHTML=!S.role?loginV():S.view==='admin'?adminV():S.sel!==null?detailV():mainV();
+ function on(q,f){Array.prototype.forEach.call(a.querySelectorAll(q),function(e){e.onclick=function(){f(e)}})}
+ on('#in',login);on('#out',function(){sb.auth.signOut().then(function(){S.role=null;S.sel=null;S.view='main';render()})});
+ on('[data-go]',function(e){S.view=e.getAttribute('data-go');S.sel=null;S.err='';render()});
+ on('button.card',function(e){S.sel=+e.getAttribute('data-i');S.par='ph';render();hist()});
+ on('#bk',function(){S.sel=null;render()});on('[data-par]',function(e){S.par=e.getAttribute('data-par');render()});
+ on('#add',add);on('[data-del]',del);on('[data-ed]',edit);
+ var pw=document.getElementById('pw');if(pw)pw.onkeydown=function(e){if(e.key==='Enter')login()};
+}
+function login(){sb.auth.signInWithPassword({email:document.getElementById('em').value.trim(),password:document.getElementById('pw').value}).then(function(r){
+ if(r.error){S.err='Email atau kata sandi salah';render();return}S.err='';boot()})}
+function boot(){sb.auth.getSession().then(function(r){var s=r.data.session;if(!s){render();return}
+ S.email=s.user.email;sb.from('profiles').select('role').eq('id',s.user.id).single().then(function(q){S.role=(q.data&&q.data.role)||'user';load()})})}
+function load(){sb.from('devices').select('id,name,loc_code,last,last_seen').order('id').then(function(r){if(!r.error){S.devs=r.data||[];if(!(document.activeElement&&document.activeElement.tagName==='INPUT'))render()}})}
+function hist(){var d=S.devs[S.sel];if(!d)return;sb.from('water_logs').select('created_at,ph,ec,tds,do,temp,turb').eq('device_id',d.id).order('created_at',{ascending:false}).limit(100).then(function(r){S.hist=(r.data||[]).reverse();render()})}
+function add(){var v=function(i){return document.getElementById(i).value.trim()},id=v('a_id'),n=v('a_n'),l=v('a_l'),k=v('a_k');
+ if(!id||!n||!l||!k){S.err='Semua kolom wajib diisi';render();return}
+ sb.from('devices').insert({id:id,name:n,loc_code:l}).then(function(r){if(r.error){S.err='Gagal: '+r.error.message;render();return}
+  sb.from('device_keys').insert({device_id:id,credential:k}).then(function(q){S.err=q.error?'Alat tersimpan, credential gagal: '+q.error.message:'';load()})})}
+function del(e){var d=S.devs[+e.getAttribute('data-del')];if(confirm('Hapus alat '+d.id+' beserta riwayat datanya?'))sb.from('devices').delete().eq('id',d.id).then(load)}
+function edit(e){var d=S.devs[+e.getAttribute('data-ed')],n=prompt('Nama alat',d.name);if(n===null)return;var l=prompt('Kode lokasi',d.loc_code);if(l===null)return;
+ sb.from('devices').update({name:n.trim()||d.name,loc_code:l.trim()||d.loc_code}).eq('id',d.id).then(load)}
+setInterval(function(){if(S.role&&S.view==='main')load()},5000);
+boot();render();
+</script>
+</body>
+</html>
