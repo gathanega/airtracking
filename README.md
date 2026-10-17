@@ -1,58 +1,169 @@
 # AirTracking
 
-Sistem pemantauan kualitas air berbasis IoT. Alat portable berbasis ESP32 mengukur **pH, EC, TDS, DO (oksigen terlarut), suhu, dan kekeruhan**, lalu mengirim datanya lewat MQTT atau HTTP ke server. Data disimpan di Supabase dan ditampilkan pada dashboard web bertema putih-biru.
+Sistem pemantauan kualitas air berbasis IoT. Alat portable berbasis ESP32 mengukur **pH, EC, TDS, DO (oksigen terlarut), suhu, dan kekeruhan**, lalu mengirim datanya ke server lewat HTTP. Server menyimpan data, menilai statusnya terhadap rentang normal (baku mutu), dan menampilkannya di dashboard web bertema putih-biru.
 
-Struktur proyek mengikuti pola [AgriFlow](https://github.com/gathanega/agriflow): `firmware/`, `server/`, `supabase/`, dan `web/`.
+Backend dan dashboard berada dalam **satu proyek Laravel**: web publik tanpa login, panel admin dengan login, API JSON, dan penerima data dari alat.
 
 ## Fitur
 
-- Dashboard grafis: ringkasan alat, kartu per alat, gauge tiap parameter, dan grafik riwayat pengukuran.
-- Login dengan dua peran: **User** (melihat data) dan **Admin** (melihat data dan mengelola alat).
-- Registrasi alat (CRUD) oleh admin: ID alat, nama, kode lokasi, dan credential.
-- Server memvalidasi ID alat dan credential sebelum menyimpan data.
-- Data dikirim lewat **MQTT** (`airtracking/<ID_ALAT>/data`) atau **HTTP** (`POST /api/ingest`).
-- Penanda **Perlu perhatian** bila ada parameter di luar rentang normal.
-- Keamanan data memakai Row Level Security (RLS) Supabase. Credential alat tidak bisa dibaca dari web.
+- **Dashboard publik** tanpa login: ringkasan, kartu per alat, kartu parameter dengan sparkline, grafik tren 7/14/30 hari, prediksi kualitas air, riwayat, dan unduh CSV.
+- **Peta lokasi** (Leaflet + OpenStreetMap): titik alat berwarna sesuai status.
+- **Panel admin** (login): registrasi alat, ganti credential, hapus alat, tandai titik di peta, panduan setup WiFi alat, dan ubah rentang normal.
+- **Penerima data** `POST /api/ingest`: memvalidasi ID alat dan credential (hash SHA-256) sebelum menyimpan, mendukung kiriman banyak data dari SD card dalam satu paket.
+- **Status per parameter**: Normal, Waspada, Di luar rentang. Alat dengan parameter di luar rentang ditandai **Perlu perhatian**.
+- **API JSON publik** (hanya baca) untuk semua data yang tampil di dashboard.
+
+Panduan lengkap setiap halaman ada di [`docs/TAMPILAN.md`](docs/TAMPILAN.md).
 
 ## Screenshot
 
-| Dashboard | Detail alat |
-|---|---|
-| ![Dashboard](docs/screenshots/dashboard.png) | ![Detail alat](docs/screenshots/detail-gauge.png) |
+![Dashboard](docs/screenshots/dashboard.png)
 
-| Grafik riwayat | Kelola alat (admin) |
+| Detail alat | Grafik dan prediksi |
 |---|---|
-| ![Grafik riwayat](docs/screenshots/grafik-riwayat.png) | ![Kelola alat](docs/screenshots/kelola-alat.png) |
+| ![Detail alat](docs/screenshots/detail-alat.png) | ![Grafik dan prediksi](docs/screenshots/grafik-prediksi.png) |
+
+| Kelola alat (admin) | Tampilan HP |
+|---|---|
+| ![Kelola alat](docs/screenshots/admin-alat.png) | ![Tampilan HP](docs/screenshots/mobile.png) |
 
 ## Arsitektur
 
 ```
 ESP32 (sensor node + controller)
-        |  MQTT: airtracking/<ID_ALAT>/data   atau   HTTP POST /api/ingest
+        |  HTTP POST /api/ingest   (JSON: id, key, nilai sensor)
         v
-Server FastAPI  --(validasi ID alat + credential)-->  Supabase (PostgreSQL + Auth)
-                                                              ^
-                                    Dashboard web (login Supabase, baca data)
+Laravel  --(validasi ID alat + credential)-->  Database (SQLite / MySQL / PostgreSQL)
+   |
+   |-- /                 dashboard publik   --> membaca /api/public/*
+   |-- /lokasi           peta lokasi        --> membaca /api/public/devices
+   |-- /admin/*          panel admin (login, peran admin)
+   '-- /api/public/*     API JSON publik (hanya baca)
 ```
 
 ## Struktur folder
 
 ```
-firmware/    (rencana) firmware ESP32 sensor node dan controller
-server/      FastAPI: terima data (MQTT/HTTP), validasi, simpan ke Supabase
-supabase/    schema.sql: tabel, trigger, dan kebijakan RLS
-web/         dashboard.html + config.js
-docs/        screenshot
+app/
+  Console/Commands/MakeAdmin.php        perintah airtracking:make-admin
+  Http/Controllers/Api/                 IngestController (alat -> server), PublicController (baca)
+  Http/Controllers/Admin/               Auth, Device, Limit, Wifi
+  Http/Middleware/                      EnsureAdmin, ForceJson
+  Models/                               Device, DeviceCredential, Measurement, Prediction, ParameterLimit, User
+  Services/                             MeasurementIngestor (simpan data), Quality (status + prediksi)
+database/
+  migrations/                           skema tabel
+  seeders/                              ParameterLimitSeeder (wajib), DemoSeeder (opsional)
+  database.sqlite                       (hanya di zip) database contoh
+public/css, public/js                   tampilan dan skrip dashboard/peta (tanpa proses build)
+resources/views/                        layouts, partials, dashboard, lokasi, admin/*
+routes/                                 web.php, api.php
+tests/                                  tes otomatis
+docs/                                   skema-database.md, TAMPILAN.md, screenshots/
 ```
 
-## Format data JSON
+Skema database lengkap (tabel, relasi, pemetaan nama JSON ke kolom) ada di [`docs/skema-database.md`](docs/skema-database.md).
+
+## Kebutuhan
+
+- PHP **8.3 atau lebih baru** (Laravel 13), ekstensi umum Laravel (mbstring, openssl, pdo, tokenizer, xml, ctype, json) dan driver database yang dipakai (mis. `pdo_sqlite`)
+- [Composer](https://getcomposer.org)
+- Database: SQLite (bawaan), MySQL/MariaDB, atau PostgreSQL
+- Akses internet di browser untuk halaman peta (Leaflet dan tile OpenStreetMap dimuat dari CDN) dan font Outfit dari Google Fonts
+
+Node.js/npm **tidak wajib**: halaman memakai berkas statis di `public/css` dan `public/js`, tanpa Vite.
+
+## Instalasi
+
+### A. Dari repositori
+
+```bash
+git clone https://github.com/gathanega/airtracking.git
+cd airtracking
+
+composer install
+cp .env.example .env
+php artisan key:generate
+
+touch database/database.sqlite        # hanya bila memakai SQLite
+php artisan migrate --seed            # tabel + rentang normal awal (wajib)
+php artisan airtracking:make-admin admin@contoh.com --name="Admin"   # diminta kata sandi, minimal 8 karakter
+php artisan db:seed --class=DemoSeeder                               # opsional: 4 alat + data contoh
+
+php artisan serve                     # http://127.0.0.1:8000
+```
+
+> `migrate --seed` menjalankan `ParameterLimitSeeder`. Tanpa seeder ini tabel rentang normal kosong, sehingga status parameter tidak muncul. Bila memakai `composer setup`, jalankan juga `php artisan db:seed`.
+
+### B. Dari `airtracking.zip`
+
+Zip sudah berisi `vendor/`, `.env`, dan `database/database.sqlite` yang terisi data contoh (4 alat, 360 data pengukuran, dan 1 akun pengguna), jadi cukup:
+
+```bash
+unzip airtracking.zip && cd airtracking
+php artisan serve
+```
+
+Bila muncul galat provider atau cache, jalankan `php artisan optimize:clear`. Bila `vendor/` tidak ikut atau tidak cocok dengan PHP Anda, jalankan `composer install`.
+
+Jangan membagikan zip ini ke pihak lain tanpa menghapus `.env` (berisi `APP_KEY`) dan `database/database.sqlite` (berisi akun dan hash credential).
+
+### Pilihan database (`.env`)
+
+```env
+# SQLite (bawaan)
+DB_CONNECTION=sqlite
+
+# MySQL / MariaDB
+DB_CONNECTION=mysql
+DB_HOST=127.0.0.1
+DB_PORT=3306
+DB_DATABASE=airtracking
+DB_USERNAME=...
+DB_PASSWORD=...
+
+# PostgreSQL: DB_CONNECTION=pgsql dan DB_PORT=5432
+```
+
+Waktu disimpan dalam **UTC** (`config/app.php`), dan dashboard menampilkannya sesuai zona waktu browser. Sesi, cache, dan antrean memakai driver `database` (tabelnya ikut dibuat oleh migrasi).
+
+### Uji coba cepat
+
+Setelah `DemoSeeder`, buka `http://127.0.0.1:8000` untuk dashboard dan `http://127.0.0.1:8000/admin/login` untuk panel admin. Kirim satu data contoh (credential demo: `demo-credential-01` sampai `demo-credential-04`):
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/ingest -H "Content-Type: application/json" \
+  -d '{"id":"AIR-01","key":"demo-credential-01","loc":"LOK-01","ph":7.1,"ec":420,"tds":210,"do":6.8,"temp":27.5,"turb":3.2}'
+# {"ok":true,"saved":1}
+```
+
+Kartu alat di dashboard diperbarui otomatis setiap 15 detik.
+
+## Halaman
+
+| Alamat | Akses | Isi |
+|---|---|---|
+| `/` | Publik | Ringkasan, daftar alat, detail alat, grafik tren, prediksi, riwayat, rentang normal, daftar API |
+| `/lokasi` | Publik | Peta lokasi alat, titik berwarna sesuai status |
+| `/admin/login` | Publik (form) | Login admin. Dibatasi 5 percobaan gagal per 5 menit per kombinasi email dan IP |
+| `/admin/devices` | Admin | Registrasi, ubah, nonaktifkan, ganti credential, hapus alat |
+| `/admin/lokasi` | Admin | Tandai titik alat di peta (klik, geser, atau ketik koordinat) |
+| `/admin/wifi` | Admin | Panduan mode AP dan mode Internet, pembuat konfigurasi JSON |
+| `/admin/limits` | Admin | Ubah rentang normal (baku mutu) |
+| `/up` | Publik | Pemeriksaan kesehatan bawaan Laravel |
+
+Halaman `/admin/*` dilindungi middleware `EnsureAdmin`. Akun biasa (bukan admin) ditolak.
+
+## Format data dari alat
+
+`POST /api/ingest` dengan JSON:
 
 ```json
 {
-  "ts": "2026-10-15T08:30:00Z",
-  "loc": "LOK-01",
   "id": "AIR-01",
   "key": "credential-alat",
+  "loc": "LOK-01",
+  "ts": "2026-10-17T08:30:00Z",
   "ph": 7.1,
   "ec": 420,
   "tds": 210,
@@ -62,179 +173,136 @@ docs/        screenshot
 }
 ```
 
-| Field | Keterangan |
+| Field | Keterangan | Batas yang diterima |
+|---|---|---|
+| `id` | ID alat (harus terdaftar dan aktif) | teks, maks 32 |
+| `key` | Credential alat | teks, maks 128 |
+| `loc` | Kode lokasi (opsional; bila kosong memakai kode lokasi alat) | teks, maks 32 |
+| `ts` | Waktu dari RTC alat (opsional; bila kosong memakai waktu server) | tanggal ISO 8601 |
+| `ph` | pH | 0 sampai 14 |
+| `ec` | EC (µS/cm) | 0 sampai 100000 |
+| `tds` | TDS (ppm) | 0 sampai 100000 |
+| `do` | DO (mg/L) | 0 sampai 60 |
+| `temp` | Suhu (°C) | -5 sampai 100 |
+| `turb` | Kekeruhan (NTU) | 0 sampai 10000 |
+
+Field status opsional: `fw` (versi firmware), `bat` (0 sampai 100), `cal_ph` dan `cal_ec` (tanggal kalibrasi), `sd_pending` (jumlah data di SD yang belum terkirim).
+
+**Banyak data dari SD card** dalam satu paket: ganti nilai sensor dengan `"records": [{"ts": "...", "ph": 7.1, ...}]` (maksimal 500 data).
+
+Balasan dan perilaku:
+
+| Kode | Arti |
 |---|---|
-| `ts` | Timestamp dari RTC alat (opsional; bila kosong, memakai waktu server) |
-| `loc` | Kode lokasi |
-| `id` | ID alat (harus sudah diregistrasi) |
-| `key` | Credential alat |
-| `ph`, `ec`, `tds`, `do`, `temp`, `turb` | Nilai sensor: pH, EC (µS/cm), TDS (ppm), DO (mg/L), suhu (°C), kekeruhan (NTU) |
+| `200` | `{"ok":true,"saved":N}` |
+| `401` | ID alat atau credential salah, alat belum diregistrasi, atau alat dinonaktifkan |
+| `422` | Nilai di luar batas fisik (mis. pH lebih dari 14) |
+| `429` | Lebih dari 120 permintaan per menit per IP |
 
-## Hardware (rencana)
+- Kirim ulang data dengan waktu yang sama **tidak menggandakan** data (unik per alat dan `measured_at`).
+- Waktu `ts` yang lebih dari 1 hari di masa depan (jam alat salah) diganti dengan waktu server.
+- Bacaan terakhir alat hanya maju: paket SD lama tidak menimpa bacaan yang lebih baru.
 
-Alat portable dengan dua ESP32 DevKit 38-pin (controller dan sensor node). Mode IoT hanya aktif saat data akan dikirim ke server.
+## API JSON publik
+
+Hanya baca, tanpa login, 60 permintaan per menit per IP. Credential alat tidak pernah ikut.
+
+| Metode | Alamat | Fungsi |
+|---|---|---|
+| GET | `/api/public/limits` | Rentang normal per parameter |
+| GET | `/api/public/devices` | Semua alat aktif + bacaan terakhir + status per parameter |
+| GET | `/api/public/devices/{id}` | Satu alat |
+| GET | `/api/public/devices/{id}/history?days=7&limit=500` | Riwayat urut waktu naik (`days` 1 sampai 365, `limit` maksimal 1000) |
+| GET | `/api/public/devices/{id}/history.csv?days=30` | Riwayat CSV (maksimal 10.000 baris) |
+| GET | `/api/public/devices/{id}/predict` | Prediksi terbaru: `aman`, `waspada`, atau `tercemar` (`409` bila alat belum mengirim data) |
+
+## Rentang normal dan status
+
+Rentang awal (diubah admin di `/admin/limits`; hanya acuan, sesuaikan dengan baku mutu yang dipakai):
+
+| Parameter | Satuan | Batas bawah | Batas atas | Waspada dekat |
+|---|---|---|---|---|
+| pH | – | 6,5 | 8,5 | kedua batas |
+| EC | µS/cm | 0 | 1500 | batas atas |
+| TDS | ppm | 0 | 500 | batas atas |
+| DO | mg/L | 5 | 14 | batas bawah |
+| Suhu | °C | 20 | 32 | kedua batas |
+| Kekeruhan | NTU | 0 | 5 | batas atas |
+
+- **Normal**: nilai di dalam rentang.
+- **Waspada**: nilai di dalam rentang tetapi berjarak kurang dari 10% lebar rentang dari batas yang berlaku.
+- **Di luar rentang**: nilai kurang dari batas bawah atau lebih dari batas atas. Satu parameter saja sudah menandai alat sebagai **Perlu perhatian**.
+
+**Prediksi** saat ini berupa aturan sederhana (`rule-v1`) yang menjumlahkan penalti status parameter, bukan model machine learning. Kolom `cod_mg_l` dan `tss_mg_l` sudah disiapkan untuk model berikutnya.
+
+## Perangkat keras alat (rencana)
+
+Alat portable dengan dua ESP32 DevKit 38-pin (controller dan sensor node). Mode internet hanya aktif saat data akan dikirim.
 
 | Bagian | Komponen |
 |---|---|
 | Sensor | pH analog (probe BNC), TDS/EC DFRobot, kekeruhan DFRobot, DS18B20, DO fluoresensi SN-3002-LDO |
 | ADC dan konverter | ADS1115 (16-bit), MAX485 (RS485 ke TTL) |
 | Controller | Modul microSD, RTC DS3231, LCD 16x2 I2C, push button (ukur, kirim, prediksi), saklar mode konfigurasi |
-| Daya | Li-ion 18650, TP4056, buck 3.3 V, LDO rendah noise, boost, proteksi (fuse, MOSFET) |
+| Daya | Li-ion 18650, TP4056, buck 3,3 V, LDO rendah noise, boost, proteksi (fuse, MOSFET) |
 
-Daftar lengkap ada di berkas komponen proyek.
+Setup WiFi alat dilakukan lewat halaman AP milik alat (`192.168.4.1`), bukan dari web ini. Halaman `/admin/wifi` hanya memberi panduan dan membuat konfigurasi JSON (tanpa kata sandi WiFi dan credential).
 
-## Instalasi
-
-### Kebutuhan
-
-- Ubuntu (lokal atau VPS), Python 3.10 atau lebih baru
-- Akun [Supabase](https://supabase.com) (paket gratis cukup)
-- (Opsional) broker MQTT, misalnya Mosquitto
-
-### 1. Supabase
-
-1. Buat project baru di Supabase.
-2. Buka **SQL Editor**, tempel isi [`supabase/schema.sql`](supabase/schema.sql), lalu **Run**.
-3. Buka **Authentication > Users > Add user**, buat akun (centang *Auto Confirm User*).
-4. Jadikan akun itu admin lewat SQL Editor (ganti emailnya):
-
-   ```sql
-   insert into profiles (id, role)
-   select id, 'admin' from auth.users where email = 'email_anda@contoh.com'
-   on conflict (id) do update set role = 'admin';
-   ```
-
-5. Buka **Project Settings > API Keys**, lalu catat:
-
-   | Kunci | Dipakai di |
-   |---|---|
-   | Project URL | `server/config.yaml` dan `web/config.js` |
-   | Secret key (`service_role`) | `server/config.yaml` saja |
-   | Publishable key (`anon`) | `web/config.js` |
-
-### 2. Server
+## Tes
 
 ```bash
-git clone https://github.com/gathanega/airtracking.git
-cd airtracking/server
-
-python3 -m venv venv
-. venv/bin/activate
-pip install -r requirements.txt
-
-cp config.example.yaml config.yaml
-nano config.yaml        # isi url dan service_key (hapus blok mqtt bila belum dipakai)
-
-uvicorn app:app --host 0.0.0.0 --port 8000
+php artisan test
 ```
 
-Cek: `curl http://localhost:8000/api/health` harus membalas `{"ok":true}`.
+Tes memakai SQLite di memori dan mencakup: penyimpanan data, penolakan credential salah atau alat nonaktif, batas fisik, data ganda, paket SD, kerahasiaan credential di API publik, akses admin, peta lokasi, dan menu header.
 
-### 3. MQTT (opsional)
+## Produksi (VPS Ubuntu)
 
-```bash
-sudo apt install -y mosquitto mosquitto-clients
-sudo systemctl enable --now mosquitto
-```
+1. Arahkan root nginx/Apache ke folder `public/` dan pakai PHP-FPM.
+2. Pasang **HTTPS** (mis. Let's Encrypt). Alat mengirim credential, jadi jangan lewat HTTP polos di internet.
+3. Di `.env`: `APP_ENV=production`, `APP_DEBUG=false`, `APP_URL` sesuai domain, dan database produksi.
+4. `composer install --no-dev --optimize-autoloader`, lalu `php artisan migrate --force --seed`.
+5. `php artisan config:cache && php artisan route:cache`.
+6. Buat admin dengan `php artisan airtracking:make-admin`. **Jangan** menjalankan `DemoSeeder` di produksi (credential demo diketahui umum).
 
-Untuk uji coba di jaringan lokal, buat `/etc/mosquitto/conf.d/air.conf`:
+Bila alat di jaringan lokal perlu mengakses server dari laptop saat uji coba, jalankan `php artisan serve --host=0.0.0.0` dan pakai IP laptop (bukan `localhost`) di alat.
 
-```
-listener 1883
-allow_anonymous true
-```
+## Keamanan
 
-Lalu `sudo systemctl restart mosquitto`. Opsi `allow_anonymous true` hanya untuk uji coba lokal. Untuk penggunaan nyata, aktifkan username dan password.
-
-### 4. Dashboard
-
-Isi `web/config.js`:
-
-```js
-window.AIR_CONFIG = {
-  SUPABASE_URL: "https://PROJECT_REF.supabase.co",
-  SUPABASE_ANON: "PUBLISHABLE_ATAU_ANON_KEY"
-};
-```
-
-Jalankan (pilih port yang kosong, misalnya 8090):
-
-```bash
-cd web
-python3 -m http.server 8090
-```
-
-Buka `http://localhost:8090/dashboard.html`, lalu login.
-
-### 5. Registrasi alat dan tes kirim data
-
-1. Login sebagai admin, buka **Kelola alat**, dan daftarkan alat (ID, nama, kode lokasi, credential).
-2. Kirim data contoh lewat HTTP:
-
-   ```bash
-   curl -X POST http://localhost:8000/api/ingest -H "Content-Type: application/json" \
-     -d '{"id":"AIR-01","key":"credential-alat","loc":"LOK-01","ph":7.1,"ec":420,"tds":210,"do":6.8,"temp":27.5,"turb":3.2}'
-   ```
-
-   Atau lewat MQTT:
-
-   ```bash
-   mosquitto_pub -h localhost -t airtracking/AIR-01/data \
-     -m '{"id":"AIR-01","key":"credential-alat","loc":"LOK-01","ph":7.2,"ec":430,"tds":215,"do":6.9,"temp":27.8,"turb":3.0}'
-   ```
-
-3. Kartu alat di dashboard terisi dalam sekitar 5 detik. Grafik riwayat muncul setelah ada minimal 2 data.
-
-### Produksi (VPS)
-
-Jalankan server sebagai service systemd memakai [`server/airtracking.service`](server/airtracking.service):
-
-```bash
-sudo cp server/airtracking.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now airtracking
-```
-
-Sesuaikan `WorkingDirectory` dan `ExecStart` dengan lokasi proyek. Bila alat mengirim data lewat internet, pasang HTTPS (misalnya nginx dengan Let's Encrypt).
-
-## Menghentikan server
-
-- Server uvicorn dan dashboard (`http.server`) dihentikan dengan **Ctrl+C** di terminal masing-masing.
-- Bila prosesnya macet atau port masih terpakai (`Address already in use`):
-
-  ```bash
-  sudo ss -ltnp | grep -E ":(8000|8090)"     # cari PID
-  sudo kill -9 PID
-  ```
-
-- Bila dijalankan sebagai service systemd: `sudo systemctl stop airtracking`.
+- Credential alat disimpan sebagai **hash SHA-256** dan hanya tampil sekali (saat dibuat atau diganti). Bila dikosongkan, credential dibuat acak 24 karakter.
+- API publik tidak pernah mengembalikan credential. Semua halaman admin dilindungi `EnsureAdmin` di sisi server.
+- Form admin memakai CSRF Laravel. Rute `/api/*` tanpa sesi.
+- Pembandingan credential memakai `hash_equals`, dan hash tetap dibandingkan walau ID alat tidak ada, supaya waktu respons tidak membocorkan ID yang valid.
+- `.env` sudah ada di `.gitignore`. Jangan commit `.env` atau `database/database.sqlite`.
 
 ## Pemecahan masalah
 
 | Gejala | Penyebab umum |
 |---|---|
-| `Address already in use` | Port dipakai program lain. Hentikan prosesnya atau pakai port lain (`--port 8001`). |
-| `401` saat kirim data | ID alat atau credential tidak cocok dengan yang diregistrasi. |
-| Tombol **Kelola alat** tidak muncul | Akun belum admin. Jalankan query admin lalu login ulang. |
-| Login gagal | `web/config.js` salah, atau user belum dibuat dengan *Auto Confirm*. |
-| Server error saat start | Periksa `url` dan `service_key` di `config.yaml`. Coba `pip install -U supabase`. |
-| ESP32 tidak bisa terhubung | Pakai IP laptop/server (bukan `localhost`) dan buka port 8000 atau 1883 di firewall. |
+| `No application encryption key has been specified` | Jalankan `php artisan key:generate`. |
+| Status parameter kosong, tabel rentang normal kosong | Seeder belum dijalankan: `php artisan db:seed --class=ParameterLimitSeeder`. |
+| `401` saat kirim data | ID atau credential salah, alat belum diregistrasi, atau alat dinonaktifkan di Kelola alat. |
+| `422` saat kirim data | Ada nilai di luar batas fisik (lihat tabel format data). |
+| Tidak bisa masuk admin | Akun belum berperan admin: `php artisan airtracking:make-admin email_anda`. Setelah 5 kali gagal, tunggu beberapa menit. |
+| Dashboard menampilkan "Data contoh, server belum terhubung" | Browser tidak dapat menjangkau `/api/public/*`. Pastikan server berjalan dan alamatnya benar. |
+| Peta kosong atau abu-abu | Browser perlu internet untuk Leaflet (unpkg) dan tile OpenStreetMap. |
+| `Address already in use` | Pakai port lain: `php artisan serve --port=8001`. |
+| ESP32 tidak bisa terhubung | Pakai IP server (bukan `localhost`), jalankan dengan `--host=0.0.0.0`, dan buka port di firewall. |
+| Galat provider atau cache setelah ekstrak zip | `php artisan optimize:clear`, atau `composer install`. |
 
-## Keamanan
+Menghentikan server: **Ctrl+C** di terminal tempat `php artisan serve` berjalan.
 
-- **Jangan** commit `server/config.yaml` (sudah ada di `.gitignore`). Berkas itu berisi Secret key.
-- Secret key hanya untuk server. Dashboard memakai Publishable (`anon`) key.
-- Bila Secret key pernah terunggah ke repositori publik, buat key baru di Supabase dan hapus yang lama.
-- Ganti `allow_anonymous true` pada Mosquitto dengan autentikasi sebelum dipakai di luar jaringan lokal.
+## Belum ada / rencana
 
-## Rencana pengembangan
-
-- [ ] Firmware ESP32: baca sensor, mode AP untuk konfigurasi WiFi, mode internet, kirim via MQTT
-- [ ] Penyimpanan cadangan di microSD saat tidak ada koneksi
-- [ ] Prediksi kualitas air dengan machine learning
-- [ ] Sesuaikan rentang normal dengan baku mutu yang dipakai (objek `P` di `web/dashboard.html`)
-- [ ] Samakan antarmuka sensor DO (dokumen rancangan menyebut RS232, daftar komponen RS485)
+- [ ] **MQTT**: penerimanya belum dibuat. `MeasurementIngestor` sudah siap dipakai (`ingest($device, $payload, 'mqtt')`); tinggal membuat perintah artisan pelanggan MQTT (mis. dengan `php-mqtt/client`) atau memakai mode HTTP di firmware. Topik yang direncanakan: `airtracking/<ID_ALAT>/data`.
+- [ ] **Firmware ESP32**: baca sensor, mode AP untuk konfigurasi WiFi, mode internet, kirim data. Folder `firmware/` belum ada di proyek ini.
+- [ ] Penyimpanan cadangan di microSD saat tidak ada koneksi (sisi server sudah mendukung paket `records`).
+- [ ] Prediksi dengan machine learning (COD/TSS) menggantikan aturan `rule-v1`.
+- [ ] Perintah dari server ke alat (konfigurasi jarak jauh).
+- [ ] Sesuaikan rentang normal dengan baku mutu yang dipakai penelitian.
+- [ ] Samakan antarmuka sensor DO (dokumen rancangan menyebut RS232, daftar komponen RS485).
+- [ ] Data dari proyek versi Supabase tidak ikut dipindahkan; credential lama berupa teks asli, jadi buat ulang lewat panel admin.
 
 ## Kredit
 
-Struktur proyek terinspirasi dari AgriFlow/GreenFlow.
+Struktur awal proyek terinspirasi dari AgriFlow/GreenFlow.
