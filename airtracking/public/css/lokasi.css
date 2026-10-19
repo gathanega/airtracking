@@ -1,0 +1,27 @@
+/* Halaman peta lokasi (publik dan admin) */
+.lokgrid{display:grid;grid-template-columns:minmax(0,1.8fr) minmax(0,1fr);gap:16px;align-items:start}
+@media(max-width:860px){.lokgrid{grid-template-columns:minmax(0,1fr)}}
+.mapbox{padding:0;overflow:hidden;position:relative}
+#peta{height:560px;width:100%;background:var(--blue2);z-index:0}
+@media(max-width:860px){#peta{height:420px}}
+.maplegend{display:flex;flex-wrap:wrap;gap:6px 16px;padding:10px 14px;border-top:1px solid var(--line);font-size:12.5px;color:var(--ink2)}
+.maplegend span{display:inline-flex;align-items:center;gap:6px}
+.maplegend i{width:12px;height:12px;border-radius:50%;display:inline-block;border:2px solid #fff;box-shadow:0 0 0 1px var(--line)}
+.pin-wrap{background:none;border:0}
+.pin{display:block;width:22px;height:22px;margin:2px;border-radius:50%;border:3px solid #fff;box-shadow:0 2px 8px rgba(15,42,74,.4);background:var(--blue)}
+.pin.ok,.maplegend i.ok{background:var(--good)}.pin.warn,.maplegend i.warn{background:#D99A00}
+.pin.crit,.maplegend i.crit{background:var(--crit)}.pin.off,.maplegend i.off{background:#9AAEC7}
+.pin.sel{background:var(--blue);box-shadow:0 0 0 4px rgba(30,111,217,.28),0 2px 8px rgba(15,42,74,.4)}
+.pin.dim{width:14px;height:14px;margin:6px;border-width:2px;opacity:.85}
+.loclist{display:flex;flex-direction:column;gap:10px;max-height:560px;overflow:auto;padding:2px}
+@media(max-width:860px){.loclist{max-height:none}}
+button.dev.loc-item{padding:14px}
+.coord{font:12.5px var(--fm);color:var(--ink2);margin-top:2px}
+.pop{min-width:210px;font-family:var(--fb)}.pop b{font:600 15px var(--fd)}
+.pop .pv{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin:8px 0}
+.pop .pv div{background:var(--s2);border-radius:8px;padding:4px 7px}.pop .pv small{display:block;font-size:10.5px;color:var(--ink3)}
+.pop .pv b{font:500 13px var(--fm)}.pop .pv .crit b{color:var(--crit)}.pop .pv .warn b{color:var(--warn)}
+.pop a{font-weight:600}
+.leaflet-container{font-family:var(--fb)}
+.mapnote{font-size:13px;margin:8px 0 0}.mapnote.warnx{color:var(--warn)}
+.pickrow{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
