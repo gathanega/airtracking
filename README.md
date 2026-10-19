@@ -60,6 +60,18 @@ Satu kartu per alat (nama, ID, kode lokasi, waktu kirim terakhir, dan enam nilai
 
 ![Riwayat, rentang normal, dan API](docs/screenshots/riwayat-api.png)
 
+### Peta lokasi
+
+Halaman publik `/lokasi` menampilkan satu titik per alat di peta (Leaflet + OpenStreetMap). Warna titik mengikuti status alat (hijau normal, kuning waspada, merah perlu perhatian, abu-abu belum ada data). Mengklik titik atau daftar **Titik alat** membuka jendela info berisi enam nilai terbaru dan tautan ke detail di dashboard.
+
+| Peta dan daftar titik | Jendela info alat |
+|---|---|
+| ![Peta lokasi](docs/screenshots/peta-lokasi.png) | ![Jendela info alat](docs/screenshots/peta-lokasi-popup.png) |
+
+Admin menandai titik alat di `/admin/lokasi`: pilih alat, lalu klik peta, geser penanda, atau ketik koordinat.
+
+![Titik lokasi (admin)](docs/screenshots/admin-lokasi.png)
+
 ### Arti warna status
 
 Status selalu disertai simbol dan teks, bukan warna saja.

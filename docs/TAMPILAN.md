@@ -163,7 +163,13 @@ Alamat `/lokasi`. Terbuka untuk umum. Memakai Leaflet dan peta OpenStreetMap, se
 - Saat dibuka pertama kali, peta menyesuaikan tampilan agar semua titik terlihat. Data diperbarui otomatis setiap 60 detik.
 - Bila data gagal dimuat, tampil pesan galat berwarna merah di atas peta.
 
-> Halaman ini tidak punya screenshot di dokumen ini karena peta memuat Leaflet dan tile dari internet.
+![Peta lokasi](screenshots/peta-lokasi.png)
+
+Jendela info setelah satu alat dipilih dari daftar:
+
+![Jendela info alat](screenshots/peta-lokasi-popup.png)
+
+> Pada screenshot ini latar peta tampil polos karena tile OpenStreetMap tidak dimuat saat gambar dibuat. Di browser dengan internet, peta menampilkan jalan dan nama tempat.
 
 ---
 
@@ -201,6 +207,8 @@ Alamat `/admin/lokasi`. Tata letak mirip peta publik, dengan formulir di sisi ka
 - Penanda alat yang sedang diatur berwarna biru, alat lain abu-abu. Mengklik penanda alat lain memilih alat itu.
 - Teks petunjuk di bawah kolom koordinat: "Klik peta untuk menaruh titik.", "Titik siap disimpan.", atau peringatan kuning bila titik di luar area Malang dan sekitarnya.
 - Tombol **Simpan titik** baru aktif bila koordinat valid.
+
+![Titik lokasi](screenshots/admin-lokasi.png)
 - Dari tabel Kelola alat, tautan koordinat membuka halaman ini dengan alat yang sudah terpilih.
 
 ---
