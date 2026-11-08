@@ -37,11 +37,33 @@ class IngestController extends Controller
         $stored = $device?->credential?->key_hash ?? str_repeat('0', 64);
         $valid = hash_equals($stored, hash('sha256', $data['key']));
 
-        if (!$device || !$valid) {
+        if (! $device || ! $valid) {
             return response()->json(['message' => 'ID alat atau credential salah, atau alat belum diregistrasi'], 401);
         }
 
-        return response()->json(['ok' => true, 'saved' => $ingestor->ingest($device, $data, 'http')]);
+        $stats = $ingestor->ingest($device, $data, 'http');
+
+        // Tidak ada pengukuran valid dan bukan heartbeat: jangan balas 200 seolah data tersimpan.
+        if ($stats['saved'] === 0 && ! $stats['heartbeat']) {
+            return response()->json([
+                'ok' => false,
+                'message' => 'Tidak ada pengukuran valid yang bisa disimpan',
+                'saved' => 0,
+                'skipped' => $stats['skipped'],
+                'ts_rejected' => $stats['ts_rejected'],
+                'ts_corrected' => $stats['ts_corrected'],
+                'heartbeat' => false,
+            ], 422);
+        }
+
+        return response()->json([
+            'ok' => true,
+            'saved' => $stats['saved'],
+            'skipped' => $stats['skipped'],
+            'ts_rejected' => $stats['ts_rejected'],
+            'ts_corrected' => $stats['ts_corrected'],
+            'heartbeat' => $stats['heartbeat'],
+        ]);
     }
 
     /** @return array<string,string> */

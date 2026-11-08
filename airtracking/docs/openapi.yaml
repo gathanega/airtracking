@@ -1,0 +1,243 @@
+openapi: 3.0.3
+info:
+  title: AirTracking API
+  version: "1.0"
+  description: |
+    API JSON AirTracking untuk pemantauan kualitas air berbasis IoT.
+    Endpoint `POST /api/ingest` dipakai alat (autentikasi `id` + `key`).
+    Endpoint `/api/public/*` hanya baca dan dibatasi 60 permintaan/menit per IP.
+servers:
+  - url: http://localhost:8000
+    description: Pengembangan lokal
+tags:
+  - name: ingest
+    description: Penerima data dari alat
+  - name: public
+    description: API publik hanya baca
+
+paths:
+  /api/ingest:
+    post:
+      tags: [ingest]
+      summary: Kirim pengukuran dari alat
+      description: |
+        Payload lama firmware v1.1.0 tetap diterima. Record tanpa satu pun nilai sensor
+        diabaikan dan `records: []` tidak membuat baris. `ts` lebih lama dari 2025-01-01
+        ditolak; `ts` lebih dari sehari di masa depan dikoreksi ke waktu server dan
+        dilaporkan lewat `ts_corrected`. Bila tidak ada pengukuran valid tetapi ada field
+        status (`fw`, `bat`, `cal_ph`, `cal_ec`, `sd_pending`), payload dianggap heartbeat:
+        status alat diperbarui tanpa mengubah bacaan terakhir.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Ingest'
+            example:
+              id: AIR-01
+              key: "<credential-alat>"
+              loc: LOK-01
+              fw: "1.1.0"
+              bat: 87
+              cal_ph: "2026-10-19"
+              cal_ec: "2026-10-19"
+              sd_pending: 0
+              ts: "2026-10-19T02:30:00Z"
+              ph: 7.1
+              ec: 420
+              tds: 210
+              do: null
+              temp: 27.5
+              turb: 3.2
+      responses:
+        '200':
+          description: Data diterima
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean, example: true }
+                  saved: { type: integer, example: 1, description: Jumlah baris pengukuran tersimpan }
+                  skipped: { type: integer, example: 0, description: Record tanpa nilai sensor yang diabaikan }
+                  ts_rejected: { type: integer, example: 0, description: Record yang ditolak karena timestamp terlalu lama/tidak valid }
+                  ts_corrected: { type: integer, example: 0, description: Record yang timestamp-nya dikoreksi ke waktu server }
+                  heartbeat: { type: boolean, example: false, description: True bila payload hanya memperbarui status alat }
+        '401':
+          description: ID alat atau credential salah
+        '422':
+          description: Nilai di luar batas fisik, tidak ada pengukuran valid, atau bukan heartbeat
+        '429':
+          description: Terlalu banyak permintaan
+
+  /api/public/limits:
+    get:
+      tags: [public]
+      summary: Rentang normal tiap parameter
+      responses:
+        '200':
+          description: Daftar batas parameter
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Limit'
+
+  /api/public/devices:
+    get:
+      tags: [public]
+      summary: Semua alat aktif + bacaan terakhir
+      responses:
+        '200':
+          description: Daftar alat
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Device'
+
+  /api/public/devices/{id}:
+    get:
+      tags: [public]
+      summary: Satu alat
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+      responses:
+        '200':
+          description: Detail alat
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Device'
+        '404':
+          description: Alat tidak ditemukan
+
+  /api/public/devices/{id}/history:
+    get:
+      tags: [public]
+      summary: Riwayat pengukuran
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+        - name: days
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 365, default: 7 }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 1000, default: 500 }
+      responses:
+        '200':
+          description: Deret pengukuran (urut waktu naik)
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Measurement'
+
+  /api/public/devices/{id}/history.csv:
+    get:
+      tags: [public]
+      summary: Unduh riwayat sebagai CSV
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+        - name: days
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 365, default: 30 }
+      responses:
+        '200':
+          description: Berkas CSV
+          content:
+            text/csv:
+              schema: { type: string }
+
+  /api/public/devices/{id}/predict:
+    get:
+      tags: [public]
+      summary: Prediksi kualitas air terbaru
+      parameters:
+        - $ref: '#/components/parameters/DeviceId'
+      responses:
+        '200':
+          description: Prediksi terbaru (skor aturan, bukan probabilitas terkalibrasi)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Prediction'
+
+components:
+  parameters:
+    DeviceId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, example: AIR-01 }
+
+  schemas:
+    Ingest:
+      type: object
+      required: [id, key]
+      properties:
+        id: { type: string, example: AIR-01 }
+        key: { type: string, description: Credential alat }
+        loc: { type: string }
+        fw: { type: string }
+        bat: { type: integer, minimum: 0, maximum: 100 }
+        cal_ph: { type: string, format: date }
+        cal_ec: { type: string, format: date }
+        sd_pending: { type: integer, minimum: 0 }
+        ts: { type: string, format: date-time, description: "UTC; < 2025-01-01 ditolak, > sekarang+1 hari dikoreksi" }
+        ph: { type: number, nullable: true }
+        ec: { type: number, nullable: true }
+        tds: { type: number, nullable: true }
+        do: { type: number, nullable: true }
+        temp: { type: number, nullable: true }
+        turb: { type: number, nullable: true }
+        records:
+          type: array
+          maxItems: 500
+          items:
+            $ref: '#/components/schemas/Measurement'
+
+    Measurement:
+      type: object
+      properties:
+        ts: { type: string, format: date-time }
+        ts_corrected: { type: boolean, description: Timestamp dikoreksi server }
+        ph: { type: number, nullable: true }
+        ec: { type: number, nullable: true }
+        tds: { type: number, nullable: true }
+        do: { type: number, nullable: true }
+        temp: { type: number, nullable: true }
+        turb: { type: number, nullable: true }
+
+    Limit:
+      type: object
+      properties:
+        param: { type: string, example: ph }
+        name: { type: string, example: pH }
+        unit: { type: string, nullable: true }
+        lo: { type: number }
+        hi: { type: number }
+        sides: { type: string, enum: [l, h, lh] }
+
+    Device:
+      type: object
+      properties:
+        id: { type: string }
+        name: { type: string }
+        location_code: { type: string }
+        latitude: { type: number, nullable: true }
+        longitude: { type: number, nullable: true }
+        last_seen_at: { type: string, format: date-time, nullable: true }
+        last_reading: { $ref: '#/components/schemas/Measurement' }
+        status: { type: object, additionalProperties: true }
+
+    Prediction:
+      type: object
+      properties:
+        label: { type: string, enum: [aman, waspada, tercemar] }
+        scores: { type: object, additionalProperties: { type: number } }
+        model_version: { type: string, example: rule-v1 }
+        confidence: { type: number, nullable: true }

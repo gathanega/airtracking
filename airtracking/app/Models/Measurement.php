@@ -8,11 +8,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class Measurement extends Model
 {
     public $timestamps = false;   // memakai measured_at dan received_at
+
     protected $guarded = [];
 
     protected function casts(): array
     {
-        return ['measured_at' => 'datetime', 'received_at' => 'datetime'];
+        return [
+            'measured_at' => 'datetime',
+            'received_at' => 'datetime',
+            'ts_corrected' => 'boolean',
+        ];
     }
 
     public function device(): BelongsTo

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\ParameterLimit;
 use App\Services\Quality;
 use Illuminate\Http\RedirectResponse;
@@ -31,6 +32,7 @@ class LimitController extends Controller
             ParameterLimit::where('param', $param)->update(['lo' => $v['lo'], 'hi' => $v['hi']]);
         }
         Quality::flushLimits();
+        AuditLog::record('limits.ubah', ['parameter' => array_keys($in)]);
 
         return redirect()->route('admin.limits')->with('ok', 'Rentang normal disimpan.');
     }

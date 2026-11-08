@@ -8,6 +8,7 @@ erDiagram
     devices ||--o{ measurements : "mengirim"
     devices ||--o{ predictions : "diprediksi"
     measurements ||--o| predictions : "dasar prediksi"
+    users ||--o{ audit_logs : "melakukan"
 
     users {
         bigint id PK
@@ -46,6 +47,7 @@ erDiagram
         timestamp measured_at
         timestamp received_at
         string source "http, mqtt, sd"
+        boolean ts_corrected "timestamp dikoreksi server"
         float ph
         float ec_us_cm
         float tds_ppm
@@ -73,6 +75,16 @@ erDiagram
         string sides "l, h, lh"
         tinyint decimals
     }
+    audit_logs {
+        bigint id PK
+        bigint user_id FK "boleh kosong untuk login gagal"
+        string action "mis. login.berhasil, device.buat"
+        string subject_type
+        bigint subject_id
+        string ip
+        json meta "tanpa credential/kata sandi"
+        timestamp created_at
+    }
 ```
 
 (`sessions`, `cache`, `jobs`, dan `password_reset_tokens` adalah tabel bawaan Laravel.)
@@ -87,6 +99,7 @@ erDiagram
 | `measurements` | Data sensor | **Unik (`device_id`, `measured_at`)**: kirim ulang paket SD tidak menggandakan data. Indeks unik itu juga mempercepat query riwayat per alat. |
 | `predictions` | Hasil klasifikasi kualitas air | Satu baris tiap kali alat mengirim data. `cod_mg_l` dan `tss_mg_l` disiapkan untuk model ML (belum ada). |
 | `parameter_limits` | Rentang normal (baku mutu) | Bisa diubah admin tanpa mengubah kode. |
+| `audit_logs` | Jejak audit admin | Mencatat login berhasil/gagal/diblokir, logout, dan aksi CRUD alat/rentang. `user_id` boleh kosong (login gagal). Tidak pernah menyimpan credential, kata sandi, atau token. |
 
 ## Pemetaan nama (JSON ⇄ kolom)
 

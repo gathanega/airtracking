@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditLog;
 use App\Models\Device;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -25,15 +26,16 @@ class DeviceController extends Controller
             'location_code' => 'required|string|max:32',
             'latitude' => 'nullable|required_with:longitude|numeric|between:-90,90',
             'longitude' => 'nullable|required_with:latitude|numeric|between:-180,180',
-            'credential' => 'nullable|string|min:8|max:128',
+            'credential' => 'nullable|string|min:20|max:128',
         ], ['code.regex' => 'ID alat: 2-32 karakter huruf, angka, - atau _.']);
 
-        $plain = $v['credential'] ?? Str::random(24);
+        $plain = $v['credential'] ?? Str::random(32);
         $device = Device::create([
             'code' => $v['code'], 'name' => $v['name'], 'location_code' => $v['location_code'],
             'latitude' => $v['latitude'] ?? null, 'longitude' => $v['longitude'] ?? null,
         ]);
         $device->setCredential($plain);
+        AuditLog::record('device.buat', ['code' => $device->code], $device);
 
         return redirect()->route('admin.devices')->with('credential', ['code' => $device->code, 'key' => $plain]);
     }
@@ -42,6 +44,7 @@ class DeviceController extends Controller
     {
         $v = $request->validate(['name' => 'required|string|max:100', 'location_code' => 'required|string|max:32']);
         $device->update($v + ['is_active' => $request->boolean('is_active')]);
+        AuditLog::record('device.ubah', ['code' => $device->code, 'aktif' => $device->is_active], $device);
 
         return redirect()->route('admin.devices')->with('ok', "Alat {$device->code} diperbarui.");
     }
@@ -69,21 +72,25 @@ class DeviceController extends Controller
             'longitude.between' => 'Longitude harus antara -180 dan 180.',
         ]);
         $device->update($v);
+        AuditLog::record('device.lokasi', ['code' => $device->code, 'lat' => $device->latitude, 'lng' => $device->longitude], $device);
 
         return redirect()->route('admin.locations', ['alat' => $device->code])->with('ok', "Titik {$device->code} disimpan.");
     }
 
     public function rotate(Device $device): RedirectResponse
     {
-        $plain = Str::random(24);
+        $plain = Str::random(32);
         $device->setCredential($plain);
+        AuditLog::record('device.rotasi', ['code' => $device->code], $device);
 
         return redirect()->route('admin.devices')->with('credential', ['code' => $device->code, 'key' => $plain]);
     }
 
     public function destroy(Device $device): RedirectResponse
     {
+        AuditLog::record('device.hapus', ['code' => $device->code]);
         $device->delete();   // riwayat, prediksi, dan credential ikut terhapus (cascade)
+
         return redirect()->route('admin.devices')->with('ok', "Alat {$device->code} dan seluruh riwayatnya dihapus.");
     }
 }
