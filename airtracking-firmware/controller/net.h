@@ -14,6 +14,9 @@
 
 enum SendResult { SEND_OK, SEND_FAIL, SEND_AUTH, SEND_REJECT };
 String g_lastNetErr;
+// true bila pengiriman TERAKHIR ditolak karena TLS tidak bisa diverifikasi (ROOT_CA kosong, ALLOW_INSECURE_TLS 0).
+// Dibaca oleh ap_mode.h untuk ditampilkan sebagai peringatan di halaman AP.
+bool g_tlsBlocked = false;
 
 bool wifiConnect(uint32_t timeoutMs = WIFI_TIMEOUT_MS) {
   if (cfg.ssid.isEmpty()) return false;
@@ -50,20 +53,37 @@ String buildPayload(const String* lines, int n, uint32_t sdPending) {
   return h + "]}";
 }
 
+// Skema bawaan HARUS https:// (bukan http://) agar credential alat tidak terkirim polos
+// saat admin lupa menulis skema di alamat server.
 String httpUrl() {
   String u = cfg.server; u.trim();
-  if (!u.startsWith("http://") && !u.startsWith("https://")) u = "http://" + u;
+  if (!u.startsWith("http://") && !u.startsWith("https://")) u = "https://" + u;
   int schemeEnd = u.indexOf("://") + 3;
   if (u.indexOf('/', schemeEnd) < 0) u += API_PATH;
   return u;
 }
 
+// Tolak kirim bila https tanpa verifikasi sertifikat, kecuali ALLOW_INSECURE_TLS 1 (uji bench saja).
+// Mengirim credential lewat TLS yang tidak diverifikasi sama bahayanya dengan mengirim lewat HTTP polos (MITM).
 SendResult httpSend(const String& body) {
   String url = httpUrl();
   bool https = url.startsWith("https://");
+  g_tlsBlocked = false;
   WiFiClient plain;
   WiFiClientSecure secure;
-  if (https) { if (strlen(ROOT_CA)) secure.setCACert(ROOT_CA); else secure.setInsecure(); }
+  if (https) {
+    if (strlen(ROOT_CA)) {
+      secure.setCACert(ROOT_CA);
+    } else if (ALLOW_INSECURE_TLS) {
+      secure.setInsecure();
+      Serial.println("[tls] PERINGATAN: ALLOW_INSECURE_TLS=1, sertifikat TIDAK diverifikasi (mode bench)");
+    } else {
+      g_lastNetErr = "TLS tidak terverifikasi: ROOT_CA kosong. Isi ROOT_CA atau set ALLOW_INSECURE_TLS 1 hanya untuk bench.";
+      g_tlsBlocked = true;
+      Serial.println("[tls] DITOLAK: " + g_lastNetErr);
+      return SEND_FAIL;
+    }
+  }
   HTTPClient http;
   http.setTimeout(12000);
   if (!http.begin(https ? (WiFiClient&)secure : plain, url)) { g_lastNetErr = "URL server tidak valid"; return SEND_FAIL; }
@@ -80,10 +100,12 @@ SendResult httpSend(const String& body) {
 }
 
 #if USE_MQTT
+// Sama seperti HTTP: tolak kirim bila broker tidak memakai TLS terverifikasi, kecuali ALLOW_INSECURE_TLS 1.
+// Username/password MQTT = ID alat/credential, jadi mqtt:// polos membocorkan credential seperti HTTP polos.
 SendResult mqttSend(const String* lines, int n, uint32_t sdPending) {
   String host = cfg.server; host.trim();
-  bool tls = false;
-  if (host.startsWith("mqtts://")) { tls = true; host = host.substring(8); }
+  bool tls = !host.startsWith("mqtt://");     // bawaan: anggap TLS kecuali ditulis eksplisit mqtt://
+  if (host.startsWith("mqtts://")) host = host.substring(8);
   else if (host.startsWith("mqtt://")) host = host.substring(7);
   int slash = host.indexOf('/'); if (slash >= 0) host = host.substring(0, slash);
   uint16_t port = tls ? 8883 : 1883;
@@ -91,7 +113,25 @@ SendResult mqttSend(const String* lines, int n, uint32_t sdPending) {
   if (colon > 0) { port = host.substring(colon + 1).toInt(); host = host.substring(0, colon); }
 
   WiFiClient plain; WiFiClientSecure secure;
-  if (tls) { if (strlen(ROOT_CA)) secure.setCACert(ROOT_CA); else secure.setInsecure(); }
+  g_tlsBlocked = false;
+  if (tls) {
+    if (strlen(ROOT_CA)) {
+      secure.setCACert(ROOT_CA);
+    } else if (ALLOW_INSECURE_TLS) {
+      secure.setInsecure();
+      Serial.println("[tls] PERINGATAN: ALLOW_INSECURE_TLS=1, MQTT TLS tidak diverifikasi (mode bench)");
+    } else {
+      g_lastNetErr = "MQTT TLS tidak terverifikasi: ROOT_CA kosong. Tulis mqtt:// hanya untuk bench lokal dengan ALLOW_INSECURE_TLS 1.";
+      g_tlsBlocked = true;
+      Serial.println("[tls] DITOLAK: " + g_lastNetErr);
+      return SEND_FAIL;
+    }
+  } else if (!ALLOW_INSECURE_TLS) {
+    g_lastNetErr = "MQTT polos (mqtt://) ditolak: credential akan terkirim tanpa enkripsi. Pakai mqtts:// atau set ALLOW_INSECURE_TLS 1 untuk bench.";
+    g_tlsBlocked = true;
+    Serial.println("[tls] DITOLAK: " + g_lastNetErr);
+    return SEND_FAIL;
+  }
   PubSubClient mqtt(tls ? (Client&)secure : (Client&)plain);
   mqtt.setServer(host.c_str(), port);
   mqtt.setBufferSize(1024);

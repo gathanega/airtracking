@@ -1,5 +1,6 @@
 // ap_page.h — halaman mode AP (192.168.4.1): SATU HTML untuk Controller + Sensor node. Tema putih-biru sama dengan web AirTracking.
 // DIHASILKAN dari ../ap_page.html (sumber utama; bisa dibuka di browser, tambahkan ?demo untuk data contoh).
+// JANGAN EDIT LANGSUNG: jalankan `node sync-ap-page.js` dari airtracking-firmware/ setelah mengubah ap_page.html.
 // Tanpa file/font eksternal (AP tidak punya internet): font Outfit dipakai bila terpasang, selain itu sistem.
 #pragma once
 #include <pgmspace.h>
@@ -7,6 +8,7 @@
 static const char AP_PAGE[] PROGMEM = R"rawliteral(<!doctype html>
 <html lang="id"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="air-token" content="__AP_TOKEN__">
 <title>AirTracking · Mode AP</title>
 <style>
 :root{--bg:#F4F9FF;--card:#fff;--s2:#F4F9FF;--ink:#0F2A4A;--ink2:#6B84A3;--blue:#1E6FD9;--blue2:#DCEAFB;--line:#E3ECF7;--grid:#E3EEFB;--good:#1F7A4D;--good2:#DCF1E5;--warn:#9A6700;--warn2:#FBEFC8;--crit:#B3261E;--crit2:#FBDEDB;--f:'Outfit',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;color-scheme:light}
@@ -121,9 +123,10 @@ var TILES=[['pH','ph',2,''],['EC','ec',0,'µS/cm'],['TDS','tds',0,'ppm'],['Suhu'
 function tiles(r){return TILES.map(function(x){return '<div class="tile"><span>'+x[0]+'</span><b>'+num(r[x[1]],x[2])+'</b> <small>'+x[3]+'</small></div>'}).join('')}
 
 /* ---------- jaringan ---------- */
+var AP_TOKEN=(document.querySelector('meta[name=air-token]')||{}).content||'';
 function api(path,body){
  if(DEMO)return demo(path,body);
- var o=body?{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:new URLSearchParams(body).toString()}:{};
+ var o=body?{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded','X-Air-Token':AP_TOKEN},body:new URLSearchParams(body).toString()}:{};
  return fetch(path,o).then(function(r){return r.json()})}
 var busy=0,fails=0,nodeOnline=null;
 function hold(p){busy++;return p.then(function(r){busy--;return r},function(e){busy--;throw e})}
@@ -136,7 +139,8 @@ function status(){api('/api/status').then(function(s){
   kv('Baterai',esc(s.bat+'% · '+s.vbat+' V'))+
   kv('microSD',s.sd?pill('terdeteksi','ok')+' '+s.pending+' data belum terkirim':pill('tidak terdeteksi','crit'))+
   kv('Kalibrasi pH / EC',esc((s.cal_ph||'belum')+' / '+(s.cal_ec||'belum')))+
-  kv('Konfigurasi',s.configured?pill('lengkap','ok'):pill('belum lengkap','warn'));
+  kv('Konfigurasi',s.configured?pill('lengkap','ok'):pill('belum lengkap','warn'))+
+  kv('Keamanan TLS',s.tls==='ok'?pill('ROOT_CA terpasang','ok'):(s.tls==='bench'?pill('TIDAK AMAN (mode bench)','crit'):pill('pengiriman diblokir, isi ROOT_CA','crit')));
  setSw(s.sw);}).catch(function(){});
  nodeInfo()}
 function nodeInfo(){api('/api/node').then(function(n){
@@ -215,7 +219,7 @@ function demoData(p,b){
  var r=function(a,s){return +(a+(Math.random()-.5)*s).toFixed(2)};
  var n=function(){return{ok:1,ph:r(7.1,.1),ec:r(420,6),tds:r(210,3),'do':null,temp:r(27.5,.2),turb:r(3.2,.4),mv_ph:r(1500,4),mv_ec:r(310,3),mv_turb:r(2800,10)}};
  if(p==='/api/live')return{ctrl:{id:'AIR-01',bat:87,vbat:4.02,sw:true},node:n()};
- if(p==='/api/status')return{id:'AIR-01',fw:'1.1.0',time:new Date().toISOString().slice(0,19)+'Z',bat:87,vbat:4.02,sd:true,pending:3,cal_ph:'2026-10-19',cal_ec:'',configured:true,sw:true};
+ if(p==='/api/status')return{id:'AIR-01',fw:'1.1.0',time:new Date().toISOString().slice(0,19)+'Z',bat:87,vbat:4.02,sd:true,pending:3,cal_ph:'2026-10-19',cal_ec:'',configured:true,sw:true,tls:'blocked'};
  if(p==='/api/node')return{ok:1,fw:'1.1.0',ads:1,v7:1500,v4:2032.4,k:1,v0:4.2,hold:1};
  if(p==='/api/config'&&b)return{ok:true,reboot:false};
  if(p==='/api/config')return{ssid:'WiFi-Lokasi',id:'AIR-01',loc:'LOK-01',proto:'http',server:'https://contoh.id/api/ingest',interval:900,has_pass:true,has_key:true};

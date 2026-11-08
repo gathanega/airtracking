@@ -1,4 +1,8 @@
-// config.h — CONTROLLER (ESP32 #1). Pin mengikuti sheet "Pinout (usulan)".
+// config.h — CONTROLLER (ESP32 #1). Board: DOIT ESP32 DevKit V1 (30 pin).
+// Semua pin di bawah tersedia di header 30 pin DOIT DevKit V1 dan tidak memakai GPIO 6–11 (flash internal).
+// Catatan board: GPIO34/35/36/39 hanya input (tanpa pull-up internal) — PIN_VBAT memakai GPIO34 (ADC1, aman).
+// GPIO5 (SD CS) adalah strapping pin yang harus HIGH saat boot; modul microSD umumnya sudah punya pull-up.
+// Jika alat gagal boot, tambahkan pull-up 10k ke 3V3 pada CS. PIN_SW_AP (13) bukan strapping pin, tetap beri pull-down 10k.
 #pragma once
 
 // ---------- Pin ----------
@@ -19,12 +23,20 @@
 #define PIN_SW_AP      13     // switch MODE AP (slide switch ke 3V3 + pull-down 10k): ON = HIGH = mode AP
 
 // ---------- Identitas & jaringan ----------
-#define AP_PASSWORD    "airtrack123"   // GANTI sebelum alat dipasang (minimal 8 karakter)
+// Sandi WiFi mode AP TIDAK LAGI satu nilai tetap untuk semua alat (risiko: siapa pun yang tahu AP_PASSWORD bawaan
+// bisa masuk ke AP alat manapun). Sandi dibuat otomatis per-alat dari MAC + salt acak, disimpan di NVS
+// (lihat settings.h: cfg.apPass / apPassEnsure()) dan ditampilkan di LCD + Serial saat pertama kali AP dibuka.
+#define AP_PASS_LEN    10              // panjang sandi AP yang dibuat otomatis (karakter)
+#define AP_MAX_CLIENTS 2               // batas klien yang boleh tersambung ke AP sekaligus
 #define DEFAULT_INTERVAL_S 900         // interval ukur+kirim awal (15 menit, sesuai Anggaran Daya)
 #define MIN_INTERVAL_S 60              // sensor perlu ±45 detik aktif per siklus
 #define MAX_INTERVAL_S 86400
 #define API_PATH       "/api/ingest"   // dilengkapi otomatis bila alamat server hanya domain
-#define ROOT_CA        ""              // PEM root CA server; kosong = HTTPS tanpa verifikasi sertifikat
+#define ROOT_CA        ""              // PEM root CA server (isi sebelum produksi, lihat firmware/README.md)
+// ALLOW_INSECURE_TLS: HARUS 0 di firmware produksi. Bila 1, alat akan mengirim data (termasuk credential)
+// tanpa verifikasi sertifikat TLS ketika ROOT_CA kosong. Hanya untuk uji bench di jaringan tepercaya.
+// Saat 0 (bawaan) dan ROOT_CA kosong, alat MENOLAK mengirim ke https:// dan mencatat error di Serial + halaman AP.
+#define ALLOW_INSECURE_TLS 0
 #define USE_MQTT       1               // 0 = buang dukungan MQTT (tidak perlu library PubSubClient)
 #define MQTT_TOPIC_FMT "airtracking/%s/data"
 

@@ -1,4 +1,7 @@
-// config.h — SENSOR NODE (ESP32 #2). Pin mengikuti sheet "Pinout (usulan)".
+// config.h — SENSOR NODE (ESP32 #2). Board: DOIT ESP32 DevKit V1 (30 pin).
+// Semua pin di bawah tersedia di header 30 pin DOIT DevKit V1 dan tidak memakai GPIO 6–11 (flash internal).
+// GPIO34/35/36/39 hanya input; sketch ini tidak memakainya. GPIO16/17 (RS485, fase 2) aman karena UART0
+// tetap di GPIO1/3 untuk Serial Monitor.
 #pragma once
 
 // ---------- Pin ----------

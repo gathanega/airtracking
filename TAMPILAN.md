@@ -13,6 +13,8 @@ Semua halaman memakai gaya bertema **putih-biru**, berbahasa Indonesia, dan berb
 | [Titik lokasi](#5-titik-lokasi) | `/admin/lokasi` | Admin |
 | [Setup WiFi alat](#6-setup-wifi-alat) | `/admin/wifi` | Admin |
 | [Rentang normal](#7-rentang-normal) | `/admin/limits` | Admin |
+| [API & integrasi](#8-api--integrasi) | `/admin/api` | Admin |
+| [Audit admin](#9-audit-admin) | `/admin/audit` | Admin |
 
 ## Gaya visual
 
@@ -59,7 +61,7 @@ Header menempel di bagian atas saat halaman digulir.
   - Pengunjung: "Pemantauan kualitas air".
   - Admin di halaman admin: "Panel admin · email admin".
 - **Menu pengunjung**: Dashboard, Peta lokasi, dan tombol **Masuk admin**.
-- **Menu admin** (di halaman `/admin/*`): Kelola alat, Titik lokasi, Setup WiFi alat, Rentang normal, Dashboard publik, dan tombol **Keluar**.
+- **Menu admin** (di halaman `/admin/*`): Kelola alat, Titik lokasi, Audit admin, Dashboard publik, dan tombol **Keluar**. Setup WiFi alat, Rentang normal, dan API & integrasi kini tampil sebagai panel di dalam halaman **Kelola alat**; halaman masing-masing tetap bisa dibuka lewat alamat.
 - Admin yang sedang melihat halaman publik melihat tombol **Panel admin** untuk kembali ke panel.
 - Menu aktif ditandai garis biru muda di bawah tulisannya.
 
@@ -185,7 +187,7 @@ Alamat `/admin/devices`.
 ![Kelola alat](screenshots/admin-alat.png)
 
 - **Kotak credential** (latar kuning): muncul sekali setelah alat dibuat atau credential diganti, berisi credential asli dengan tombol **Salin**. Credential **tidak bisa dilihat lagi** setelah halaman ditutup; bila hilang, gunakan "Ganti credential".
-- **Registrasi alat baru**: ID alat (2 sampai 32 karakter huruf, angka, `-`, atau `_`), Nama, Kode lokasi, Latitude dan Longitude (opsional, harus diisi berpasangan), dan Credential (kosongkan untuk dibuat acak 24 karakter, minimal 8 karakter bila diisi).
+- **Registrasi alat baru**: ID alat (2 sampai 32 karakter huruf, angka, `-`, atau `_`), Nama, Kode lokasi, Latitude dan Longitude (opsional, harus diisi berpasangan), dan Credential (min. 20 karakter; kosongkan untuk dibuat acak 32 karakter).
 - **Alat terdaftar**: tabel dengan kolom ID, Nama (dapat diubah langsung), Lokasi (dapat diubah langsung), Koordinat (tautan ke halaman Titik lokasi, atau "Tandai" bila belum ada), kotak centang Aktif, Credential (hanya `••••` dan 4 karakter terakhir), dan waktu terakhir kirim.
 - Tombol per baris: **Simpan**, **Ganti credential** (dengan konfirmasi, alat harus disetel ulang), dan **Hapus** (dengan konfirmasi, riwayat data alat ikut terhapus).
 - Alat yang tidak dicentang Aktif ditolak saat mengirim data dan tidak tampil di dashboard publik.
@@ -225,6 +227,26 @@ Alamat `/admin/limits`. Tabel semua parameter dengan kolom Parameter, Satuan, Ba
 - Batas atas harus lebih besar dari batas bawah, bila tidak tampil pesan galat dan perubahan tidak disimpan.
 - Perubahan berlaku untuk status di dashboard, peta, dan prediksi.
 - Angka awal hanya acuan; sesuaikan dengan baku mutu yang dipakai.
+
+---
+
+## 8. API & integrasi
+
+Alamat `/admin/api`. Halaman khusus admin yang merangkum **endpoint publik**, field `POST /api/ingest`, contoh `curl`, dan tombol unduh spesifikasi **OpenAPI**.
+
+![API & integrasi](screenshots/admin-api.png)
+
+- Semua endpoint mengembalikan JSON (kecuali CSV). API publik hanya baca dan dibatasi 60 permintaan/menit per IP.
+- `POST /api/ingest` memakai autentikasi **id + key** (credential alat). Respons sukses membawa statistik: `{"ok":true,"saved":N,"skipped":N,"ts_rejected":N,"ts_corrected":N,"heartbeat":false}`.
+- `401` bila ID/credential salah; `422` bila nilai di luar batas fisik, semua record kosong, atau tidak ada pengukuran valid dan bukan heartbeat.
+
+## 9. Audit admin
+
+Alamat `/admin/audit`. Halaman yang menampilkan **100 aksi terakhir** oleh admin: login, logout, dan perubahan data.
+
+![Audit admin](screenshots/admin-audit.png)
+
+- Credential, kata sandi, dan token **tidak pernah** dicatat di audit log.
 
 ---
 

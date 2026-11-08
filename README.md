@@ -33,26 +33,31 @@ Sistem pemantauan kualitas air berbasis IoT. Alat portable berbasis **ESP32** me
 - **Prediksi kualitas air** (`aman` / `waspada` / `tercemar`), saat ini berbasis aturan sederhana.
 - **Cadangan microSD** di alat: data tetap tersimpan saat WiFi/server putus dan dikirim pada siklus berikutnya.
 - **Mode AP** di alat: setup WiFi, identitas, dan kalibrasi lewat satu halaman web dari HP.
+- **Layar muat penuh** di halaman depan (preloader) dan **opsi tema terang/gelap** (toggle di header).
 - Credential alat disimpan sebagai hash dan tidak pernah ditampilkan oleh API publik.
 
 ## Tampilan
 
-Semua halaman bertema **putih-biru**, berbahasa Indonesia, dan responsif (HP sampai desktop). Panduan lengkapnya ada di [`docs/TAMPILAN.md`](docs/TAMPILAN.md).
+Semua halaman bertema **putih-biru** (dengan opsi **tema gelap**), berbahasa Indonesia, dan responsif (HP sampai desktop). Panduan lengkapnya ada di [`docs/TAMPILAN.md`](docs/TAMPILAN.md).
 
 | Halaman | Alamat | Akses | Isi |
 |---|---|---|---|
-| Dashboard | `/` | Publik | Ringkasan, daftar alat, kartu parameter + sparkline, grafik tren, prediksi, riwayat, daftar API |
+| Dashboard | `/` | Publik | Ringkasan, daftar alat, kartu parameter + sparkline, grafik tren, prediksi, riwayat |
 | Peta lokasi | `/lokasi` | Publik | Peta alat dengan titik berwarna sesuai status |
-| Login admin | `/admin/login` | Publik (form) | Masuk admin, dibatasi 5 percobaan gagal per 5 menit |
+| Login admin | `/admin/login` | Publik (form) | Masuk admin, dibatasi 5 percobaan gagal/5 menit per email+IP dan 20 percobaan/15 menit per IP |
 | Kelola alat | `/admin/devices` | Admin | Registrasi, ubah, nonaktifkan, ganti credential, hapus alat |
 | Titik lokasi | `/admin/lokasi` | Admin | Tandai titik alat di peta (klik, geser, atau ketik koordinat) |
 | Setup WiFi alat | `/admin/wifi` | Admin | Panduan mode AP/Internet dan pembuat konfigurasi JSON |
+| API & integrasi | `/admin/api` | Admin | Daftar endpoint publik + ingest, contoh `curl`, dan unduh OpenAPI ([lihat tampilan](#api--integrasi)) |
+| Audit admin | `/admin/audit` | Admin | 100 aksi terbaru: login, logout, dan perubahan data (tanpa credential/kata sandi) |
 | Setup di alat (Mode AP) | `192.168.4.1` | Lewat WiFi alat | Status, pembacaan langsung, WiFi/server, dan kalibrasi ([lihat tampilan](#halaman-setup-alat-mode-ap)) |
 | Rentang normal | `/admin/limits` | Admin | Ubah baku mutu tiap parameter |
 
 ### Dashboard publik
 
 Satu kartu per alat (nama, ID, kode lokasi, waktu kirim terakhir, dan enam nilai terbaru), lalu detail alat terpilih: strip status (sinkron, baterai, kalibrasi, antrean SD), enam kartu parameter dengan sparkline, grafik tren dengan pita rentang normal, dan panel prediksi.
+
+Saat halaman dibuka, tampil **layar muat penuh** (preloader) sampai data siap; header menyediakan **toggle tema terang/gelap** (pilihan tersimpan di browser). Halaman depan tidak lagi menampilkan panel API — dokumentasi integrasi dipindahkan ke **`/admin/api`**.
 
 ![Detail alat](docs/screenshots/detail-alat.png)
 
@@ -85,9 +90,19 @@ Status selalu disertai simbol dan teks, bukan warna saja.
 
 ### Panel admin
 
-| Kelola alat | Setup WiFi alat | Rentang normal |
-|---|---|---|
-| ![Kelola alat](docs/screenshots/admin-alat.png) | ![Setup WiFi](docs/screenshots/admin-wifi.png) | ![Rentang normal](docs/screenshots/admin-rentang.png) |
+Halaman **Kelola alat** menyediakan panel: Integrasi alat & API, Setup WiFi alat, Rentang normal, dan registrasi alat baru.
+
+| Panel | Isi |
+|---|---|
+| ![Kelola alat](docs/screenshots/admin-alat.png) | Integrasi alat & API, Setup WiFi alat, Rentang normal, registrasi alat baru, dan daftar alat |
+
+### API & integrasi
+
+Halaman **`/admin/api`** (khusus admin) merangkum endpoint publik, field `POST /api/ingest`, contoh `curl`, **contoh respons satu alat**, **template kirim data**, dan tombol unduh
+spesifikasi **OpenAPI** (`airtracking/docs/openapi.yaml`). Halaman ini juga ditautkan dari **Kelola alat** agar integrasi
+alat tidak perlu dibuka dari dokumentasi terpisah.
+
+![API & integrasi](docs/screenshots/admin-api.png)
 
 ### Halaman setup alat (Mode AP)
 
@@ -102,7 +117,7 @@ Selain web server, alat sendiri punya halaman web saat **switch AP ON**. HP ters
 |---|---|
 | ![Mode AP di HP](docs/screenshots/ap-mode-hp.png) | ![Mode AP lengkap](docs/screenshots/ap-mode-lengkap.png) |
 
-> Halaman ini dapat dilihat tanpa alat: buka `firmware/ap_page.html` di browser dengan tambahan `?demo` pada alamatnya.
+> Halaman ini dapat dilihat tanpa alat: buka `airtracking-firmware/ap_page.html` di browser dengan tambahan `?demo` pada alamatnya.
 
 ### Tampilan di HP
 
@@ -136,7 +151,7 @@ public/      aset CSS dan JS dashboard
 resources/   tampilan (Blade), CSS, JS
 routes/      web.php, api.php
 tests/       tes otomatis
-firmware/    firmware ESP32: controller/ dan sensor_node/ (lihat firmware/README.md)
+airtracking-firmware/  firmware ESP32: controller/ dan sensor_node/ (lihat airtracking-firmware/README.md)
 ```
 
 ## Instalasi server (web)
@@ -223,7 +238,7 @@ Jalankan lewat PHP-FPM + nginx, dan pantau dengan systemd bila memakai worker an
 
 ## Instalasi firmware (alat)
 
-Firmware Arduino untuk **dua ESP32 DevKit 38-pin**: `controller` (jadwal, daya, microSD, RTC, LCD, WiFi, kirim ke server, mode AP) dan `sensor_node` (ADS1115, DS18B20, kalibrasi). Rincian lengkap ada di [`firmware/README.md`](firmware/README.md).
+Firmware Arduino untuk **dua board DOIT ESP32 DevKit V1 (30 pin)**: `controller` (jadwal, daya, microSD, RTC, LCD, WiFi, kirim ke server, mode AP) dan `sensor_node` (ADS1115, DS18B20, kalibrasi). Rincian lengkap ada di [`airtracking-firmware/README.md`](airtracking-firmware/README.md).
 
 ### 1. Siapkan Arduino IDE
 
@@ -239,7 +254,7 @@ WiFi, WebServer, DNSServer, HTTPClient, SD, dan Preferences sudah bawaan core ES
 
 ### 2. Atur `config.h`
 
-- Di `controller/config.h`: **ganti `AP_PASSWORD`** (bawaan `airtrack123`). Untuk HTTPS produksi, isi `ROOT_CA` dengan PEM root CA server (bila kosong, sertifikat tidak diverifikasi).
+- Di `controller/config.h`: isi `ROOT_CA` dengan PEM root CA server untuk HTTPS produksi. Bila kosong, alat **menolak mengirim** (bawaan `ALLOW_INSECURE_TLS 0`); jangan set flag itu di produksi. Sandi WiFi mode AP kini dibuat otomatis per alat (lihat `airtracking-firmware/README.md`).
 - `protocol.h` harus sama di kedua folder sketch.
 - Sensor DO (fase 2): set `USE_DO 1` di **kedua** `config.h` setelah memeriksa parameter Modbus di datasheet.
 
@@ -256,7 +271,7 @@ Buka `controller/controller.ino` dan `sensor_node/sensor_node.ino` sebagai dua s
 5. Kalibrasi pH (2 titik: buffer 7.00 dan 4.00), EC (larutan 1413 µS/cm), dan kekeruhan (aquades) sambil memantau **Pembacaan langsung**.
 6. Geser **switch AP ke OFF**. Alat langsung mengukur dan mengirim, lalu tidur sesuai interval (bawaan 15 menit, minimum 60 detik).
 
-> **Status firmware:** kode sudah ditulis dan dicek sintaksnya, tetapi **belum diuji di hardware** dengan toolchain ESP32 asli. Siapkan waktu uji bench pertama (panduan ada di `firmware/README.md`).
+> **Status firmware:** kode sudah ditulis dan dicek sintaksnya, tetapi **belum diuji di hardware** dengan toolchain ESP32 asli. Siapkan waktu uji bench pertama (panduan ada di `airtracking-firmware/README.md`).
 
 ## Format data dan API
 
@@ -285,7 +300,9 @@ Data dari alat (`POST /api/ingest`, 120 permintaan per menit per IP):
 | `key` | Credential alat |
 | `ph`, `ec`, `tds`, `do`, `temp`, `turb` | pH, EC (µS/cm), TDS (ppm), DO (mg/L), suhu (°C), kekeruhan (NTU) |
 
-Banyak data sekaligus (antrean SD): ganti nilai sensor dengan `"records":[{"ts":"...","ph":7.1,...}]` (maks 500). Field status opsional: `fw`, `bat` (0–100), `cal_ph`, `cal_ec`, `sd_pending`. Balasan `{"ok":true,"saved":N}`; `401` bila ID atau credential salah; `422` bila nilai di luar batas fisik.
+Banyak data sekaligus (antrean SD): ganti nilai sensor dengan `"records":[{"ts":"...","ph":7.1,...}]` (maks 500). Field status opsional: `fw`, `bat` (0–100), `cal_ph`, `cal_ec`, `sd_pending`. Balasan `{"ok":true,"saved":N,"skipped":N,"ts_rejected":N,"ts_corrected":N,"heartbeat":false}`; `401` bila ID atau credential salah; `422` bila nilai di luar batas fisik atau tidak ada pengukuran valid.
+
+Integritas data (P0-04): record tanpa satu pun nilai sensor diabaikan, `records: []` tidak membuat baris, dan `ts` lebih lama dari 2025-01-01 ditolak. `ts` lebih dari sehari di masa depan dikoreksi ke waktu server (`ts_corrected`). Payload tanpa nilai sensor tetapi berisi field status dianggap **heartbeat**: status alat diperbarui tanpa mengubah bacaan terakhir. Karena itu alat lama (firmware v1.1.0) tetap kompatibel.
 
 API publik (hanya baca, 60 permintaan per menit per IP):
 
@@ -298,11 +315,12 @@ API publik (hanya baca, 60 permintaan per menit per IP):
 | GET | `/api/public/devices/{id}/history.csv?days=30` | Riwayat CSV |
 | GET | `/api/public/devices/{id}/predict` | Prediksi terbaru |
 
-Skema database: [`docs/skema-database.md`](docs/skema-database.md).
+Skema database: [`airtracking/docs/skema-database.md`](airtracking/docs/skema-database.md).
+Spesifikasi API (OpenAPI 3.0): [`airtracking/docs/openapi.yaml`](airtracking/docs/openapi.yaml) — juga bisa diunduh dari halaman admin **`/admin/api`**.
 
 ## Hardware
 
-Alat portable dengan dua ESP32 DevKit 38-pin (controller dan sensor node). Mode IoT hanya aktif saat data akan dikirim.
+Alat portable dengan dua board **DOIT ESP32 DevKit V1 (30 pin)** (controller dan sensor node). Mode IoT hanya aktif saat data akan dikirim. Tabel pinout lengkap dan catatan pin strapping/input-only ada di [`airtracking-firmware/README.md`](airtracking-firmware/README.md#board-doit-esp32-devkit-v1-30-pin).
 
 | Bagian | Komponen |
 |---|---|
@@ -311,7 +329,7 @@ Alat portable dengan dua ESP32 DevKit 38-pin (controller dan sensor node). Mode 
 | Controller | Modul microSD, RTC DS3231, LCD 16x2 I2C, tombol UKUR dan LCD, switch mode AP |
 | Daya | Li-ion 18650, TP4056, buck 3.3 V, LDO rendah noise, boost, proteksi (fuse, MOSFET) |
 
-Pinout lengkap dan cara kerja siklus ukur ada di [`firmware/README.md`](firmware/README.md).
+Pinout lengkap dan cara kerja siklus ukur ada di [`airtracking-firmware/README.md`](airtracking-firmware/README.md).
 
 ## Pemecahan masalah
 
@@ -320,7 +338,7 @@ Pinout lengkap dan cara kerja siklus ukur ada di [`firmware/README.md`](firmware
 | `Address already in use` | Port 8000 dipakai program lain. Pakai `php artisan serve --port=8001`. |
 | Error koneksi database | Periksa `DB_*` di `.env`, lalu `php artisan config:clear`. |
 | Menu admin ditolak | Akun belum admin. Buat dengan `php artisan airtracking:make-admin`. |
-| Login gagal terus | Dibatasi 5 percobaan per 5 menit per email dan IP. Tunggu lalu coba lagi. |
+| Login gagal terus | Dibatasi 5 percobaan/5 menit per email+IP dan 20 percobaan/15 menit per IP. Tunggu lalu coba lagi. |
 | `401` saat kirim data | ID alat atau credential tidak cocok. Ganti credential di `/admin/devices`, isi ulang lewat mode AP. |
 | `422` saat kirim data | Nilai sensor di luar batas fisik (mis. pH > 14). Di alat, data dipindah ke `/rejected.ndjson`. |
 | ESP32 tidak bisa terhubung ke server lokal | Pakai IP laptop (bukan `localhost`), jalankan `php artisan serve --host=0.0.0.0`, dan buka port 8000 di firewall. |
@@ -331,13 +349,16 @@ Pinout lengkap dan cara kerja siklus ukur ada di [`firmware/README.md`](firmware
 
 ## Keamanan
 
-- Credential alat disimpan sebagai hash SHA-256 dan hanya tampil sekali (saat dibuat atau diganti). Bila kolom dikosongkan, credential acak 24 karakter dibuat otomatis.
+- Credential alat disimpan sebagai hash SHA-256 dan hanya tampil sekali (saat dibuat atau diganti). Credential manual minimal 20 karakter; bila kolom dikosongkan, credential acak 32 karakter dibuat otomatis.
+- Login admin dibatasi **5 percobaan/5 menit per email+IP** dan **20 percobaan/15 menit per IP**, sehingga percobaan yang mengganti-ganti email dari satu jaringan tetap diblokir.
+- Aksi admin dan percobaan login dicatat di tabel **`audit_logs`** (waktu, user, aksi, IP, ringkasan). Credential, kata sandi, dan token tidak pernah ditulis ke audit log.
 - API publik tidak pernah mengembalikan credential. Semua halaman admin dilindungi `EnsureAdmin` di sisi server.
 - Form admin memakai CSRF Laravel; API `/api/*` tanpa sesi.
 - **Jangan commit `.env`** (berisi kredensial database dan `APP_KEY`).
-- Pasang **HTTPS** di produksi dan isi `ROOT_CA` di firmware.
+- Pasang **HTTPS** di produksi dan isi `ROOT_CA` di firmware. Bawaan firmware menolak HTTPS tanpa verifikasi (`ALLOW_INSECURE_TLS 0`); hanya aktifkan flag itu untuk bench.
 - Credential dan sandi WiFi tersimpan polos di NVS alat; aktifkan flash encryption bila alat bisa jatuh ke tangan lain.
-- Ganti `AP_PASSWORD` bawaan firmware sebelum alat dipasang.
+- Sandi WiFi mode AP dibuat otomatis unik per alat (10 karakter, disimpan di NVS, tampil di LCD/Serial). Semua endpoint POST di mode AP mewajibkan token sesi `X-Air-Token`; AP dibatasi 2 klien.
+- Halaman **API & integrasi** (`/admin/api`) hanya bisa dibuka admin dan menyediakan unduhan OpenAPI.
 
 ## Status dan rencana pengembangan
 

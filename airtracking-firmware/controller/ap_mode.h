@@ -21,9 +21,18 @@ static uint32_t apLastActivity = 0;
 static uint32_t apRebootAt = 0;
 static bool apBySwitch = false;      // true: AP dibuka lewat switch, ditutup saat switch OFF (tanpa restart)
 static bool apRoutesSet = false;
+static String apSessionToken;        // token acak per sesi AP; wajib disertakan di header X-Air-Token untuk POST
 
 static void apTouch() { apLastActivity = millis(); }
 static void apJson(int code, const String& body) { apTouch(); apServer.send(code, "application/json", body); }
+
+// Tolak permintaan POST yang mengubah state (config/kalibrasi/reboot/ukur) tanpa token sesi yang benar.
+// Mencegah klien lain di WiFi AP yang sama (maks AP_MAX_CLIENTS) memicu perubahan tanpa membuka halaman dulu.
+static bool apRequireToken() {
+  if (apServer.header("X-Air-Token") == apSessionToken && apSessionToken.length()) return true;
+  apServer.send(401, "application/json", "{\"ok\":false,\"err\":\"token sesi tidak valid, muat ulang halaman\"}");
+  return false;
+}
 
 static String apSsid() {
   String id = cfg.devId;
@@ -31,7 +40,12 @@ static String apSsid() {
   return "AirTrack-" + id;
 }
 
-static void apHandleRoot() { apTouch(); apServer.send_P(200, "text/html; charset=utf-8", AP_PAGE); }
+static void apHandleRoot() {
+  apTouch();
+  String html = FPSTR(AP_PAGE);
+  html.replace("__AP_TOKEN__", apSessionToken);
+  apServer.send(200, "text/html; charset=utf-8", html);
+}
 
 // Status Controller. full=false: tanpa hitung antrean SD (dipakai polling cepat /api/live).
 static String ctrlStatusJson(bool full) {
@@ -44,6 +58,9 @@ static String ctrlStatusJson(bool full) {
     o += String("\"sd\":") + (sdOk ? "true" : "false") + "," + jInt("pending", pendingCount()) + ",";
     o += jStr("cal_ph", cfg.calPh) + "," + jStr("cal_ec", cfg.calEc) + ",";
     o += String("\"configured\":") + (cfgConfigured() ? "true" : "false") + ",";
+    // tls: "ok" = ROOT_CA terisi, "bench" = ALLOW_INSECURE_TLS 1 (tidak aman, hanya uji), "blocked" = kirim ditolak
+    String tls = strlen(ROOT_CA) ? "ok" : (ALLOW_INSECURE_TLS ? "bench" : "blocked");
+    o += jStr("tls", tls) + ",";
   }
   o += String("\"ap_switch\":") + (apBySwitch ? "true" : "false") + "}";
   return o;
@@ -100,6 +117,7 @@ static void apHandleGetConfig() {
 }
 
 static void apHandleSetConfig() {
+  if (!apRequireToken()) return;
   String ssid = apServer.arg("ssid"), id = apServer.arg("id"), server = apServer.arg("server");
   String proto = apServer.arg("proto"), pass = apServer.arg("pass"), key = apServer.arg("key"), loc = apServer.arg("loc");
   ssid.trim(); id.trim(); server.trim(); loc.trim();
@@ -127,6 +145,7 @@ static void apHandleSetConfig() {
 }
 
 static void apHandleMeasure() {
+  if (!apRequireToken()) return;
   apTouch();
   NodeReading r; String err;
   bool ok = takeMeasurement(r, err);
@@ -136,6 +155,7 @@ static void apHandleMeasure() {
 }
 
 static void apHandleCal() {
+  if (!apRequireToken()) return;
   apTouch();
   String t = apServer.arg("t"), cmd;
   if (t == "ph7") cmd = "{\"c\":\"cal_ph\",\"v\":7}";
@@ -161,7 +181,10 @@ static void apHandleCal() {
   apServer.send(200, "application/json", "{\"ok\":1," + jStr("detail", detail) + "}");
 }
 
-static void apHandleReboot() { apJson(200, "{\"ok\":true}"); apRebootAt = millis() + 800; }
+static void apHandleReboot() {
+  if (!apRequireToken()) return;
+  apJson(200, "{\"ok\":true}"); apRebootAt = millis() + 800;
+}
 
 static void apNotFound() {                 // captive portal: arahkan semua ke halaman setup
   apTouch();
@@ -175,9 +198,12 @@ static void apNotFound() {                 // captive portal: arahkan semua ke h
 bool runApMode(uint32_t idleMs, bool forever, bool bySwitch = false) {
   apBySwitch = bySwitch;
   apRebootAt = 0;
+  String apPass = apPassEnsure();                 // sandi unik per alat, dibuat sekali dan disimpan di NVS
+  { uint8_t buf[8]; esp_fill_random(buf, sizeof(buf)); apSessionToken = ""; for (int i = 0; i < 8; i++) { char h[3]; snprintf(h, 3, "%02x", buf[i]); apSessionToken += h; } }
   Serial.println(String("[ap] mode AP") + (bySwitch ? " (switch): " : ": ") + apSsid());
+  Serial.println("[ap] sandi WiFi: " + apPass + "  (lihat juga LCD)");
   WiFi.mode(WIFI_AP_STA);
-  WiFi.softAP(apSsid().c_str(), AP_PASSWORD);
+  WiFi.softAP(apSsid().c_str(), apPass.c_str(), 1, 0, AP_MAX_CLIENTS);
   delay(200);
   apDns.start(53, "*", WiFi.softAPIP());
 
@@ -185,10 +211,12 @@ bool runApMode(uint32_t idleMs, bool forever, bool bySwitch = false) {
   g_keep5v = true; g_nodeHold = true;
   rail5v(true);
   delay(RAIL_SETTLE_MS);
-  if (lcdBegin()) lcdMsg(bySwitch ? "MODE AP (switch)" : "MODE AP", apSsid());
+  if (lcdBegin()) lcdMsg(apSsid(), "Sandi: " + apPass);
   { String r, e; nodeQuick("status", r, e, 3000); }       // bangunkan node; bila gagal halaman menampilkan Offline
 
   if (!apRoutesSet) {
+    static const char* hdrs[] = {"X-Air-Token"};
+    apServer.collectHeaders(hdrs, 1);
     apServer.on("/", HTTP_GET, apHandleRoot);
     apServer.on("/api/status", HTTP_GET, apHandleStatus);
     apServer.on("/api/node", HTTP_GET, apHandleNode);
