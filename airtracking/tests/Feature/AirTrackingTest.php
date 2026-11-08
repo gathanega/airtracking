@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\Device;
 use App\Models\DeviceCredential;
+use App\Models\Measurement;
 use App\Models\User;
 use Database\Seeders\ParameterLimitSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -25,6 +26,7 @@ class AirTrackingTest extends TestCase
     {
         $d = Device::create(['code' => 'AIR-01', 'name' => 'Kolam', 'location_code' => 'LOK-01', 'is_active' => $active]);
         $d->setCredential(self::KEY);
+
         return $d;
     }
 
@@ -74,7 +76,7 @@ class AirTrackingTest extends TestCase
         $this->postJson('/api/ingest', $this->payload(['ph' => 7.3]))->assertOk();
 
         $this->assertDatabaseCount('measurements', 1);
-        $this->assertEquals(7.3, \App\Models\Measurement::first()->ph);
+        $this->assertEquals(7.3, Measurement::first()->ph);
     }
 
     public function test_paket_sd_lama_tidak_menimpa_bacaan_terbaru(): void
@@ -112,7 +114,13 @@ class AirTrackingTest extends TestCase
 
     public function test_dashboard_publik_terbuka_tanpa_login_dan_admin_butuh_login(): void
     {
-        $this->get('/')->assertOk();
+        $this->get('/')
+            ->assertOk()
+            ->assertSee('id="preloader"', false)
+            ->assertSee('preloader-css', false)
+            ->assertSee('id="ath-theme-btn"', false)
+            ->assertSee('data-theme="light"', false);
+        $this->get('/admin/login')->assertOk()->assertDontSee('id="preloader"', false);
         $this->get('/admin/devices')->assertRedirect('/admin/login');
     }
 

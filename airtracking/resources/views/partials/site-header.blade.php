@@ -8,8 +8,7 @@
         $menu = [
             ['Kelola alat', route('admin.devices'), request()->routeIs('admin.devices*')],
             ['Titik lokasi', route('admin.locations'), request()->routeIs('admin.locations')],
-            ['Setup WiFi alat', route('admin.wifi'), request()->routeIs('admin.wifi')],
-            ['Rentang normal', route('admin.limits'), request()->routeIs('admin.limits*')],
+            ['Audit admin', route('admin.audit'), request()->routeIs('admin.audit')],
             ['Dashboard publik', route('home'), false],
         ];
     } else {
@@ -40,6 +39,13 @@
         <a class="ath-link" href="{{ $href }}" @if ($on) aria-current="page" @endif>{{ $label }}</a>
       @endforeach
 
+      @if (!$inAdmin)
+        <button class="ath-theme" type="button" id="ath-theme-btn" aria-label="Buka pengatur tema">
+          <svg class="ath-theme-ic" data-theme="sun" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M2 12h2M22 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/></svg>
+          <svg class="ath-theme-ic" data-theme="moon" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/></svg>
+        </button>
+      @endif
+
       @if ($inAdmin)
         <form class="ath-out" method="POST" action="{{ route('admin.logout') }}">@csrf<button class="ath-cta" type="submit">Keluar</button></form>
       @elseif ($admin)
@@ -58,5 +64,14 @@
       var open = n.classList.toggle('is-open');
       b.setAttribute('aria-expanded', open); b.setAttribute('aria-label', open ? 'Tutup menu' : 'Buka menu');
     });
+    var tb = document.getElementById('ath-theme-btn');
+    if (tb) {
+      tb.addEventListener('click', function () {
+        var dark = document.documentElement.getAttribute('data-theme') === 'dark';
+        var t = dark ? 'light' : 'dark';
+        document.documentElement.setAttribute('data-theme', t);
+        try { localStorage.setItem('airtheme', t); } catch (e) { }
+      });
+    }
   })();
 </script>

@@ -44,3 +44,20 @@
   .ath-brand{gap:10px}.ath-brand svg{width:42px;height:42px}.ath-brand b{font-size:20px}.ath-brand small{font-size:12.5px;max-width:190px}
 }
 @media(prefers-reduced-motion:reduce){.ath *{transition:none!important}}
+
+/* Toggle tema (opsi dark theme) */
+.ath-theme{display:inline-flex;align-items:center;justify-content:center;width:44px;height:44px;border:1px solid var(--line,#E3ECF7);border-radius:12px;background:#fff;color:var(--ath-ink);cursor:pointer;flex:none}
+.ath-theme .ath-theme-ic{display:none;width:20px;height:20px}
+.ath-theme-ic[data-theme="sun"]{display:block}.ath-theme-ic[data-theme="moon"]{display:none}
+[data-theme="dark"] .ath-theme-ic[data-theme="sun"]{display:none}
+[data-theme="dark"] .ath-theme-ic[data-theme="moon"]{display:block}
+.ath-theme:hover{background:var(--s2)}
+
+/* Dark theme: nilai tema gelap untuk header publik */
+[data-theme="dark"] .ath{
+  --ath-ink:#E8F0FA;--ath-mute:#9DB4CC;--ath-link:#5CB1FF;--ath-underline:#4FC3F7;
+  --ath-bar:#0B3A6B;--ath-cta:#2E6FDB;--ath-cta-h:#3B82D9;
+  background:#0B1626;border-bottom:1px solid var(--line,#1F3A5F)
+}
+[data-theme="dark"] .ath-burger{background:var(--card);border-color:var(--line,#1F3A5F);color:var(--ath-ink)}
+[data-theme="dark"] .ath-brand b i{color:var(--ath-link)}

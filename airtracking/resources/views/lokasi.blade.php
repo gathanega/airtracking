@@ -1,6 +1,8 @@
 @extends('layouts.app')
 @section('title', 'Peta lokasi · AirTracking')
 
+@include('partials.preloader')
+
 @push('head')
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
 <link rel="stylesheet" href="{{ asset('css/lokasi.css') }}">

@@ -24,4 +24,10 @@ button.dev.loc-item{padding:14px}
 .pop a{font-weight:600}
 .leaflet-container{font-family:var(--fb)}
 .mapnote{font-size:13px;margin:8px 0 0}.mapnote.warnx{color:var(--warn)}
-.pickrow{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+/* Dark theme (opsi tema gelap) */
+[data-theme="dark"] .pin{border-color:#0B1626;box-shadow:0 2px 8px rgba(0,0,0,.55)}
+[data-theme="dark"] .pin.warn{background:var(--warn)}
+[data-theme="dark"] .pin.off{background:var(--ink3)}
+[data-theme="dark"] .pin.sel{background:var(--blue);box-shadow:0 0 0 4px rgba(92,177,255,.35),0 2px 8px rgba(0,0,0,.55)}
+[data-theme="dark"] .maplegend i{border-color:#0B1626}
+[data-theme="dark"] #peta{background:var(--blue2)}

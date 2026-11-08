@@ -1,5 +1,8 @@
 @extends('layouts.app')
 @section('title', 'AirTracking · Dashboard kualitas air')
+
+@include('partials.preloader')
+
 @section('content')
 <div>
   <h1>Dashboard kualitas air</h1>
@@ -12,7 +15,6 @@
 <section class="grid" id="devs"></section>
 <div id="detail" style="display:flex;flex-direction:column;gap:16px"></div>
 <section class="panel" id="limpanel"></section>
-<section class="panel" id="apipanel"></section>
 @endsection
 
 @push('scripts')

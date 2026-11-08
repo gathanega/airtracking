@@ -25,7 +25,11 @@ class LokasiTest extends TestCase
 
     public function test_peta_publik_terbuka_tanpa_login(): void
     {
-        $this->get('/lokasi')->assertOk()->assertSee('Peta lokasi');
+        $this->get('/lokasi')
+            ->assertOk()
+            ->assertSee('Peta lokasi')
+            ->assertSee('id="preloader"', false)
+            ->assertSee('preloader-css', false);
     }
 
     public function test_api_publik_menyertakan_koordinat_atau_null(): void

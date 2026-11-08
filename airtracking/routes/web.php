@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Admin\ApiDocsController;
+use App\Http\Controllers\Admin\AuditController;
 use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\DeviceController;
 use App\Http\Controllers\Admin\LimitController;
@@ -32,5 +34,10 @@ Route::prefix('admin')->group(function () {
         Route::get('wifi', [WifiController::class, 'show'])->name('admin.wifi');
         Route::get('limits', [LimitController::class, 'index'])->name('admin.limits');
         Route::put('limits', [LimitController::class, 'update'])->name('admin.limits.update');
+
+        Route::get('api', [ApiDocsController::class, 'index'])->name('admin.api');
+        Route::get('api/openapi.yaml', [ApiDocsController::class, 'openapi'])->name('admin.api.openapi');
+        Route::get('api/summary.json', [ApiDocsController::class, 'summary'])->name('admin.api.summary');
+        Route::get('audit', [AuditController::class, 'index'])->name('admin.audit');
     });
 });

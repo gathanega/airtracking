@@ -1,8 +1,8 @@
 /* Dashboard publik AirTracking. Data dari /api/public/*; bila server tidak terjangkau, memakai data contoh. */
 (function () {
-  const { K, LIM, ST, esc, status, fmt, dt, dd, ago, worst, copy, origin, api, title, DEMO, BASE } = AT;
+  const { K, LIM, ST, esc, status, fmt, dt, dd, ago, worst, copy, origin, api, title, DEMO, BASE, hidePreloader } = AT;
   const $ = (id) => document.getElementById(id);
-  const S = { devs: [], sel: null, par: 'ph', days: 14, hist: [], pred: null, demo: false, cx: null };
+  const S = { devs: [], sel: null, par: 'ph', days: 14, hist: [], pred: null, demo: false, cx: null, loading: true };
   const cur = () => S.devs.find((d) => d.id === S.sel);
 
   function get(path, demoFn) {
@@ -11,6 +11,17 @@
       S.demo = true; $('demo').hidden = false;
       return demoFn();
     });
+  }
+
+  /* ---------- loading ---------- */
+  function renderLoading() {
+    $('tiles').innerHTML =
+      `<div class="card tile"><span>Muat data</span><b>...</b></div>` +
+      `<div class="card tile"><span>Muat data</span><b>...</b></div>` +
+      `<div class="card tile"><span>Muat data</span><b>...</b></div>`;
+    $('devs').innerHTML = '<div class="empty" style="grid-column:1/-1">Memuat data alat...</div>';
+    $('detail').innerHTML = '<div class="empty">Memuat detail alat...</div>';
+    $('limpanel').innerHTML = '<div class="empty">Memuat rentang normal...</div>';
   }
 
   /* ---------- ringkasan + daftar alat ---------- */
@@ -167,20 +178,6 @@
     $('limpanel').innerHTML = '<h2 style="margin-bottom:10px">Rentang normal yang dipakai</h2><div class="tw"><table class="l"><tr><th>Parameter</th><th>Rentang</th><th>Satuan</th></tr>' +
       K.map((k) => { const p = LIM[k]; return `<tr><td>${esc(p.name)}</td><td class="mono">${p.sides === 'lh' ? p.lo + ' – ' + p.hi : p.sides === 'h' ? '≤ ' + p.hi : '≥ ' + p.lo}</td><td>${esc(p.unit || '–')}</td></tr>`; }).join('') +
       '</table></div><p class="note">Angka acuan awal; admin dapat menyesuaikannya dengan baku mutu penelitian.</p>';
-
-    const o = origin(), id = (cur() || {}).id || 'AIR-01';
-    const eps = [['GET', '/api/public/limits', 'Rentang normal per parameter'], ['GET', '/api/public/devices', 'Daftar alat + bacaan terakhir + status'],
-      ['GET', `/api/public/devices/${id}`, 'Satu alat'], ['GET', `/api/public/devices/${id}/history?days=7&limit=500`, 'Riwayat (JSON)'],
-      ['GET', `/api/public/devices/${id}/history.csv?days=30`, 'Riwayat (CSV)'], ['GET', `/api/public/devices/${id}/predict`, 'Prediksi kualitas air']];
-    const sample = JSON.stringify(cur() || { id: 'AIR-01', name: 'Kolam Utama', loc_code: 'LOK-01', last: { ts: '2026-10-17T08:30:00Z', ph: 7.1, ec: 420, tds: 210, do: 6.8, temp: 27.5, turb: 3.2 } }, null, 2);
-    const send = JSON.stringify({ id, key: '<credential-alat>', loc: (cur() || {}).loc_code || 'LOK-01', ph: 7.1, ec: 420, tds: 210, do: 6.8, temp: 27.5, turb: 3.2 }, null, 2);
-    $('apipanel').innerHTML = '<div class="head"><h2>API JSON</h2></div><p class="note" style="margin:0 0 10px">Data dapat diambil siapa saja tanpa login (hanya baca). Batas 60 permintaan per menit per alamat IP.</p>' +
-      '<div class="tw"><table class="l"><tr><th>Metode</th><th>Alamat</th><th>Fungsi</th></tr>' +
-      eps.map((e) => `<tr><td class="mono">${e[0]}</td><td class="mono">${esc(e[1])}</td><td>${e[2]}</td></tr>`).join('') + '</table></div>' +
-      `<div class="cols" style="margin-top:14px"><div><div class="head"><h3>Contoh respons satu alat</h3><button class="btn s ghost" data-cp="r">Salin</button></div><pre id="cp_r">${esc(sample)}</pre></div>` +
-      `<div><div class="head"><h3>Kirim data dari alat</h3><button class="btn s ghost" data-cp="s">Salin</button></div><pre id="cp_s">POST ${esc(o)}/api/ingest\nContent-Type: application/json\n\n${esc(send)}</pre></div></div>` +
-      '<p class="note">Satu paket bisa berisi banyak data dari SD card lewat <span class="mono">"records": [ {"ts": "...", "ph": 7.1, ...} ]</span>.</p>';
-    $('apipanel').querySelectorAll('[data-cp]').forEach((b) => b.onclick = () => copy($('cp_' + b.dataset.cp).textContent, b));
   }
 
   /* ---------- muat data ---------- */
@@ -191,6 +188,8 @@
   }
 
   function load() {
+    S.loading = true;
+    renderLoading();
     return get('/api/public/limits', DEMO.limits).then((l) => { Object.keys(l).forEach((k) => { LIM[k] = l[k]; }); })
       .then(() => get('/api/public/devices', DEMO.devices))
       .then((d) => {
@@ -198,7 +197,8 @@
         const h = decodeURIComponent(location.hash.slice(1));
         if (!S.devs.some((x) => x.id === S.sel)) S.sel = S.devs.some((x) => x.id === h) ? h : (S.devs[0] || {}).id || null;
         renderTop(); renderDetail(); renderStatic(); return loadHist();
-      });
+      })
+      .then(() => { S.loading = false; hidePreloader(); });
   }
 
   setInterval(() => {
@@ -210,5 +210,5 @@
     }).catch(() => {});
   }, 15000);
 
-  load().catch((e) => { $('devs').innerHTML = `<div class="empty" style="grid-column:1/-1">Gagal memuat data: ${esc(e.message)}</div>`; });
+  load().catch((e) => { hidePreloader(); $('devs').innerHTML = `<div class="empty" style="grid-column:1/-1">Gagal memuat data: ${esc(e.message)}</div>`; });
 })();

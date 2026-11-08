@@ -3,6 +3,36 @@
 @section('content')
 @include('partials.admin-nav')
 
+<section class="panel" style="margin-bottom:14px">
+  <div class="head" style="margin-bottom:0">
+    <div>
+      <b>Integrasi alat &amp; API</b>
+      <div class="note" style="margin:2px 0 0">Daftar endpoint, field <code>/api/ingest</code>, contoh curl, contoh respons, dan unduh OpenAPI.</div>
+    </div>
+    <a class="btn s ghost" href="{{ route('admin.api') }}">Buka API &amp; integrasi</a>
+  </div>
+</section>
+
+<section class="panel" style="margin-bottom:14px">
+  <div class="head" style="margin-bottom:0">
+    <div>
+      <b>Setup WiFi alat</b>
+      <div class="note" style="margin:2px 0 0">Panduan mode AP/Internet dan pembuat konfigurasi JSON untuk alat (dikelola lewat ESP32).</div>
+    </div>
+    <a class="btn s ghost" href="{{ route('admin.wifi') }}">Buka Setup WiFi alat</a>
+  </div>
+</section>
+
+<section class="panel" style="margin-bottom:14px">
+  <div class="head" style="margin-bottom:0">
+    <div>
+      <b>Rentang normal</b>
+      <div class="note" style="margin:2px 0 0">Ubah baku mutu per parameter untuk status Normal / Waspada / Di luar rentang.</div>
+    </div>
+    <a class="btn s ghost" href="{{ route('admin.limits') }}">Buka Rentang normal</a>
+  </div>
+</section>
+
 @if (session('credential'))
   <div class="keybox" role="alert">
     <b>Credential alat {{ session('credential.code') }}:</b> <code id="newkey">{{ session('credential.key') }}</code>
@@ -21,7 +51,7 @@
       <label>Kode lokasi<input name="location_code" value="{{ old('location_code') }}" placeholder="LOK-01" required></label>
       <label>Latitude (opsional)<input name="latitude" value="{{ old('latitude') }}" inputmode="decimal" placeholder="-7.9800"></label>
       <label>Longitude (opsional)<input name="longitude" value="{{ old('longitude') }}" inputmode="decimal" placeholder="112.6300"></label>
-      <label>Credential (kosongkan untuk dibuat acak)<input name="credential" minlength="8" autocomplete="off"></label>
+      <label>Credential (min. 20 karakter; kosongkan untuk dibuat acak)<input name="credential" minlength="20" autocomplete="off"></label>
     </div>
     @if ($errors->any())<div class="err" role="alert">{{ $errors->first() }}</div>@endif
     <button class="btn" type="submit">Tambah alat</button>

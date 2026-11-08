@@ -80,5 +80,17 @@
     }
   };
 
-  window.AT = { title: title, K: K, LIM: LIM, ST: ST, esc: esc, status: status, fmt: fmt, dt: dt, dd: dd, ago: ago, worst: worst, copy: copy, origin: origin, api: api, DEMO: DEMO, BASE: BASE };
+  // Layar muat: tutup setelah data halaman siap (minimal tampil 700 ms agar animasi terlihat).
+  var mulaiMuat = Date.now();
+  function hidePreloader() {
+    var p = document.getElementById('preloader');
+    if (!p) return;
+    var sisa = Math.max(0, 700 - (Date.now() - mulaiMuat));
+    setTimeout(function () {
+      p.classList.add('is-hidden');
+      setTimeout(function () { if (p.parentNode) p.parentNode.removeChild(p); }, 600);
+    }, sisa);
+  }
+
+  window.AT = { title: title, K: K, LIM: LIM, ST: ST, esc: esc, status: status, fmt: fmt, dt: dt, dd: dd, ago: ago, worst: worst, copy: copy, origin: origin, api: api, DEMO: DEMO, BASE: BASE, hidePreloader: hidePreloader };
 })();

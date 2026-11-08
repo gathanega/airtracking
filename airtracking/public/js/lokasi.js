@@ -80,9 +80,15 @@
     }, function (e) { $('err').textContent = 'Gagal memuat data alat: ' + e.message; });
   }
 
-  map = PETA.create('peta');
-  group = L.layerGroup().addTo(map);
+  try {
+    map = PETA.create('peta');
+    group = L.layerGroup().addTo(map);
+  } catch (e) {
+    $('err').textContent = 'Peta tidak dapat dimuat: ' + e.message;
+    A.hidePreloader();
+    return;
+  }
   $('reset').onclick = function () { map.flyTo(PETA.MALANG, PETA.ZOOM, { duration: .6 }); };
-  load();
+  load().then(function () { A.hidePreloader(); });
   setInterval(load, 60000);
 })();
